@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Debian 一键安装：更新、UFW、Snell Server
 
 set -e
 
