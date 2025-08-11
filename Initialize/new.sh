@@ -1,48 +1,74 @@
 #!/usr/bin/env bash
-# Debian 一键脚本 —— 更新、安装并配置 ufw，安装 Snell Server
+
 set -e
 
-# 1. 更新软件包列表并升级已安装的软件
-sudo apt update && sudo apt upgrade -y
-
-# 2. 安装 UFW 和 wget
-sudo apt install -y ufw wget
-
-# 3. 提示用户输入 TCP 端口（空格分隔）
-read -p "请输入需要开放的 TCP 端口（空格分隔），回车跳过: " tcp_ports
-if [ -n "$tcp_ports" ]; then
-  echo "开放 TCP 端口：$tcp_ports"
-  sudo ufw allow $tcp_ports/tcp
-else
-  echo "未输入 TCP 端口，跳过 TCP 开放"
+# 确保脚本以 sudo 或 root 身份运行
+if [[ $EUID -ne 0 ]]; then
+  echo "请使用 sudo 运行此脚本：sudo $0"
+  exit 1
 fi
 
-# 4. 提示用户输入 UDP 端口
-#    - 回车继承 TCP 端口
-#    - 输入 00 不开启任何 UDP 端口
-read -p "请输入需要开放的 UDP 端口（回车继承 TCP，输入 00 不开启 UDP）: " udp_ports
-if [ "$udp_ports" = "00" ]; then
-  echo "选择不开放任何 UDP 端口"
-elif [ -z "$udp_ports" ]; then
-  if [ -n "$tcp_ports" ]; then
-    echo "继承 TCP 端口，开放 UDP：$tcp_ports"
-    sudo ufw allow $tcp_ports/udp
-  else
-    echo "未输入 TCP 端口，跳过 UDP 开放"
-  fi
-else
-  echo "开放 UDP 端口：$udp_ports"
-  sudo ufw allow $udp_ports/udp
+echo "==========================================="
+echo "  Debian 一键安装：更新、UFW、Snell Server"
+echo "==========================================="
+echo
+
+# 1. 更新并升级系统
+echo "[1/4] 更新软件包列表并升级系统..."
+apt update && apt -y upgrade
+echo "完成系统更新。"
+echo
+
+# 2. 安装 UFW
+echo "[2/4] 安装 UFW 防火墙..."
+apt -y install ufw
+echo "UFW 安装完成。"
+echo
+
+# 配置防火墙规则
+# 2.1 输入 TCP 端口列表
+read -p "请输入要开放的 TCP 端口（多个端口以空格分隔），输入后回车确认： " TCP_PORTS
+
+# 2.2 输入 UDP 端口列表
+read -p "请输入要开放的 UDP 端口，默认为 TCP 端口列表，输入 00 则不开放 UDP： " UDP_PORTS
+
+# 如果用户直接回车，继承 TCP；如果输入 00，则清空列表
+if [[ -z "$UDP_PORTS" ]]; then
+  UDP_PORTS="$TCP_PORTS"
+elif [[ "$UDP_PORTS" == "00" ]]; then
+  UDP_PORTS=""
 fi
 
-# 5. 自动启用 UFW（无需交互）
-sudo ufw --force enable
-echo "UFW 已启用并应用规则。"
+# 添加规则
+echo "配置 UFW 规则..."
+for port in $TCP_PORTS; do
+  ufw allow proto tcp from any to any port "$port"
+  echo "允许 TCP 端口: $port"
+done
 
-# 6. 下载并运行 Snell Server 安装脚本
-echo "下载并安装 Snell Server..."
+if [[ -n "$UDP_PORTS" ]]; then
+  for port in $UDP_PORTS; do
+    ufw allow proto udp from any to any port "$port"
+    echo "允许 UDP 端口: $port"
+  done
+else
+  echo "未配置任何 UDP 端口。"
+fi
+
+# 3. 启用 UFW
+echo "[3/4] 启用 UFW 防火墙（确认 y）："
+ufw --force enable
+echo "UFW 已启用。"
+echo
+
+# 4. 安装 Snell Server
+echo "[4/4] 下载并安装 Snell Server..."
 wget -O snell.sh --no-check-certificate https://git.io/Snell.sh
 chmod +x snell.sh
-sudo ./snell.sh
+./snell.sh
+echo "Snell Server 安装完成。"
+echo
 
-echo "所有操作完成！"
+echo "==========================================="
+echo "一键安装脚本执行完毕！"
+echo "==========================================="
