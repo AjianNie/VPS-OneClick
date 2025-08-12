@@ -14,7 +14,7 @@ read -p "准备好后回车，按照指引输入以上信息"
 # 从 @BotFather 获取 Token、Telegram 用户 ID、Telegraph API Tokens
 echo
 echo "请依次输入以下信息："
-read -p "1) Telegram Bot Token" BOT_TOKEN
+read -p "1) Telegram Bot Token: " BOT_TOKEN
 read -p "2) 您的 Telegram 用户ID: " MANAGER_ID
 read -p "3) Telegraph API access tokens（多个则使用英文逗号分隔）: " TELEGRAPH_TOKENS
 
