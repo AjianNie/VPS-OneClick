@@ -7,15 +7,16 @@ echo "==========================================="
 echo "开始前，您还需要："
 echo "1. 从 @BotFather 新建机器人并获取Token"
 echo "2. 从 @userinfobot 获取您的 Telegram ID"
-echo "3. API access tokens（在 https://telegra.ph/ 个人页面获取，可准备多个，用逗号分隔）"
-echo "准备好后，回车，按照指引输入以上信息"
+echo "3. API access tokens（在 https://api.telegra.ph/createAccount?short_name=RSStT&author_name=Generated%20by%20RSStT&author_url=https%3A%2F%2Fgithub.com%2FRongronggg9%2FRSS-to-Telegram-Bot 页面获取，刷新一次即为新token，用逗号分隔）"
+echo "==========================================="
+read -p "准备好后回车，按照指引输入以上信息"
 
 # 从 @BotFather 获取 Token、Telegram 用户 ID、Telegraph API Tokens
 echo
 echo "请依次输入以下信息："
 read -p "1) Telegram Bot Token" BOT_TOKEN
 read -p "2) 您的 Telegram 用户ID: " MANAGER_ID
-read -p "3) Telegraph API tokens（英文逗号分隔，可多个）: " TELEGRAPH_TOKENS
+read -p "3) Telegraph API access tokens（多个则使用英文逗号分隔）: " TELEGRAPH_TOKENS
 
 
 set -euo pipefail
