@@ -4,6 +4,19 @@ echo "在 Debian 服务器上一键安装并配置 RSS-to-Telegram-Bot"
 echo "PyPI 版 + systemd 后台服务"
 echo "原文:https://github.com/Rongronggg9/RSS-to-Telegram-Bot/blob/dev/docs/deployment-guide.md"
 echo "==========================================="
+echo "开始前，您还需要："
+echo "1. 从 @BotFather 新建机器人并获取Token"
+echo "2. 从 @userinfobot 获取您的 Telegram ID"
+echo "3. API access tokens（在 https://telegra.ph/ 个人页面获取，可准备多个，用逗号分隔）"
+echo "准备好后，回车，按照指引输入以上信息"
+
+# 从 @BotFather 获取 Token、Telegram 用户 ID、Telegraph API Tokens
+echo
+echo "请依次输入以下信息："
+read -p "1) Telegram Bot Token" BOT_TOKEN
+read -p "2) 您的 Telegram 用户ID: " MANAGER_ID
+read -p "3) Telegraph API tokens（英文逗号分隔，可多个）: " TELEGRAPH_TOKENS
+
 
 set -euo pipefail
 
@@ -16,13 +29,6 @@ sudo apt install -y python3 python3-pip python3-venv wget
 # 2. （可选）安装中文字体用于 HTML 表格渲染
 echo "==> 默认安装中文字体以支持表格渲染…"
 sudo apt install -y fonts-wqy-microhei
-
-# 3. 从 @BotFather 获取 Token、Telegram 用户 ID、Telegraph API Tokens
-echo
-echo "请依次输入以下信息："
-read -p "1) Telegram Bot Token (来自 @BotFather): " BOT_TOKEN
-read -p "2) 你的 Telegram 用户 ID (来自 @userinfobot): " MANAGER_ID
-read -p "3) Telegraph API tokens（逗号分隔，可多个）: " TELEGRAPH_TOKENS
 
 # 4. 创建项目目录与虚拟环境
 PROJECT_DIR="$HOME/rsstt"
