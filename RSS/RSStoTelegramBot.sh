@@ -90,4 +90,3 @@ echo
 echo "安装完成！"
 echo "可通过 'sudo journalctl -u rsstt -f' 查看实时日志。"
 echo "运行状态：sudo systemctl status rsstt"
-```
