@@ -145,7 +145,9 @@ if [ $? -eq 0 ]; then
     echo "PM2 中已存在名为 'rsshub' 的进程，将尝试重启。"
     pm2 restart rsshub
 else
-    pm2 start lib/index.js --name rsshub
+    # 使用 npm run start 启动，更符合项目定义
+    echo "PM2 中未找到 'rsshub' 进程，将尝试启动新进程。"
+    pm2 start npm --name rsshub -- run start
 fi
 
 if [ $? -ne 0 ]; then
