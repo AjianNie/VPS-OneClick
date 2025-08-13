@@ -119,8 +119,9 @@ fi
 echo "RSSHub 源码下载/更新完成。"
 
 # 7. 安装 RSSHub 依赖
-echo ">>> 7. 正在安装 RSSHub 项目依赖..."
-npm install --production
+echo ">>> 7. 正在安装 RSSHub 项目所有依赖 (包括开发依赖)..."
+# 将 npm install --production 改为 npm install
+npm install
 if [ $? -ne 0 ]; then
     echo "错误：RSSHub 依赖安装失败。"
     exit 1
