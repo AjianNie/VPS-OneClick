@@ -22,12 +22,14 @@ read -p "3) Telegraph API access tokens（多个则使用英文逗号分隔）: 
 set -euo pipefail
 
 # 1. 系统更新与基础工具安装
+echo
 echo "==> 更新系统并安装基础工具…"
 sudo apt update
 sudo apt upgrade -y
 sudo apt install -y python3 python3-pip python3-venv wget
 
 # 2. （可选）安装中文字体用于 HTML 表格渲染
+echo
 echo "==> 默认安装中文字体以支持表格渲染…"
 sudo apt install -y fonts-wqy-microhei
 
@@ -41,6 +43,7 @@ python3 -m venv venv
 source venv/bin/activate
 
 # 5. 安装与升级核心 Python 包
+echo
 echo "==> 升级 pip、安装 rsstt…"
 pip install --upgrade pip setuptools wheel
 pip install rsstt
