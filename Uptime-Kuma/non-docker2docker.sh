@@ -3,9 +3,12 @@ echo "--- Uptime Kuma 数据恢复脚本 ---"
 echo "------------------------------"
 echo "警告：在运行此脚本前，请确保 Uptime Kuma 容器已停止！"
 echo "例如：docker stop uptime-kuma"
-echo "------------------------------"
+echo "---------------"
 echo "预备工作："
 echo "先将uptime-kuma/data数据包压缩，重命名为“data.tar.gz”，再上传到root文件夹下"
+read -p "准备好后回车确认"
+echo "------------------------------"
+echo "开始迁移数据…"
 # 命令失败时立即退出
 set -e
 
