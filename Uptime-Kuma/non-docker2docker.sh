@@ -9,6 +9,8 @@ echo "先将uptime-kuma/data数据包压缩，重命名为“data.tar.gz”，�
 read -p "准备好后回车确认"
 echo "------------------------------"
 echo "开始迁移数据…"
+
+
 # 命令失败时立即退出
 set -e
 
