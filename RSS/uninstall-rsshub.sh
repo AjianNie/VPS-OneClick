@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# 非docker安装方式的一键rsshub卸载
+
 # 检查是否以root用户运行
 if [ "$EUID" -ne 0 ]; then
   echo "错误：请使用 sudo 运行此脚本，例如：sudo ./cleanup_rsshub.sh"
