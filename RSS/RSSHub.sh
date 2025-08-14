@@ -91,10 +91,11 @@ pm2 startup systemd -u "$(whoami)" --hp "$HOME"
 pm2 save
 
 # 12. 完成提示
-echo ""
+echo
 echo ">>> 部署完成！RSSHub 已启动，监听端口：$PORT"
 echo "访问地址： http://$(hostname -I | awk '{print $1}'):$PORT"
-echo ""
+echo "pm2 管理命令示例： pm2 status rsshub | pm2 stop rsshub | pm2 restart rsshub | pm2 logs rsshub"
+echo
 cat <<MESSAGE
 可以通过设置环境变量来配置 RSSHub。在项目根目录新建一个 .env 文件，
 每行以 NAME=VALUE 格式添加环境变量，例如：
