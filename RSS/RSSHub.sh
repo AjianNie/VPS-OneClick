@@ -183,7 +183,7 @@ pm2 stop rsshub 2>/dev/null
 pm2 delete rsshub 2>/dev/null
 
 # 直接启动编译后的 JavaScript 文件，并指定工作目录
-pm2 start ":markdown-math{single="true" encoded="RSSHUB_DIR%2Flib%2Findex.js%22%20--name%20rsshub%20--cwd%20%22"}RSSHUB_DIR"
+pm2 start "$RSSHUB_DIR/lib/index.js" --name rsshub --cwd "$RSSHUB_DIR"
 
 if [ $? -ne 0 ]; then
     echo "错误：RSSHub 启动失败，请检查日志。"
@@ -221,4 +221,16 @@ echo "   示例 \`.env\` 文件内容（请根据需要修改或添加）："
 echo "   \`\`\`"
 echo "   CACHE_TYPE=memory" # 默认为 memory，可改为 redis
 echo "   CACHE_EXPIRE=3600" # 缓存过期时间，单位秒
-echo "   # 如果
+echo "   # 如果您部署了 Redis，请取消注释并填写 Redis URL"
+echo "   # REDIS_URL=redis://localhost:6379/"
+echo "   # 如果您在 ARM/ARM64 架构上遇到 puppeteer 问题，请尝试设置："
+echo "   # CHROMIUM_EXECUTABLE_PATH=chromium"
+echo "   \`\`\`"
+echo "   修改 \`.env\` 文件后，请运行 \`cd $RSSHUB_DIR && pm2 restart rsshub\` 使配置生效。"
+echo "3. **更新 RSSHub**：进入 \`$RSSHUB_DIR\` 目录，执行以下命令以更新到最新版本并重启："
+echo "   \`git pull && pnpm install --production && pnpm build && pm2 restart rsshub\`"
+echo "   注意：这里将 `npm install --production` 改为 `pnpm install --production`，因为我们现在使用 pnpm。"
+echo "4. **查看 RSSHub 运行状态**：\`pm2 status\`"
+echo "5. **查看 RSSHub 日志**：\`pm2 logs rsshub\`"
+echo "6. 此脚本未包含 Nginx 等反向代理配置，如需通过 80/443 端口访问并配置 HTTPS，请自行配置 Nginx 或 Caddy。"
+echo "-------------------------------------------------"
