@@ -6,10 +6,10 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
-echo "--- RSSHub 清除脚本 (仅清除 RSSHub 相关部分，并清理缓存) ---"
-echo "此脚本将删除 RSSHub 源码、依赖和其在 PM2 中的配置。"
-echo "将额外清理 pnpm/npm 缓存和 PM2 日志，但会征求您的确认。"
-echo "不会卸载 PM2 本身或影响其他 PM2 管理的应用程序。"
+echo "--- RSSHub 完全清除脚本 (安全模式，不误伤其他服务) ---"
+echo "此脚本旨在彻底删除所有与 RSSHub 相关的源码、编译产物、依赖、缓存和 PM2 配置。"
+echo "对于可能影响系统其他服务的组件（如 Node.js、Chromium），会征求您的确认。"
+echo "PM2 自身不会被卸载，其管理的其它应用的启动项和配置不受影响。"
 echo "------------------------------------------------------------------"
 
 # 定义 RSSHub 安装目录
@@ -24,7 +24,7 @@ pm2 delete rsshub 2>/dev/null
 pm2 save 2>/dev/null
 echo "RSSHub 的 PM2 进程已停止并从列表中移除。"
 
-echo ">>> 2. 删除 RSSHub 源码目录 ($RSSHUB_DIR)..."
+echo ">>> 2. 删除 RSSHub 源码目录 ($RSSHUB_DIR)，包含所有编译产物和项目依赖..."
 if [ -d "$RSSHUB_DIR" ]; then
     rm -rf "$RSSHUB_DIR"
     echo "目录 $RSSHUB_DIR 已删除。"
@@ -132,8 +132,15 @@ fi
 
 echo ">>> 8. 清理 PM2 日志文件..."
 # PM2 日志通常在 ~/.pm2/logs
-PM2_LOGS_DIR=$(pm2 env | grep 'PM2_HOME' | cut -d '=' -f 2 | tr -d "'" | xargs -I {} echo "{}/logs")
+# 尝试获取 PM2_HOME 环境变量，如果未设置，则默认为 ~/.pm2
+PM2_HOME_DIR=$(pm2 env | grep 'PM2_HOME' | cut -d '=' -f 2 | tr -d "'" | xargs echo)
+if [ -z "$PM2_HOME_DIR" ]; then
+    PM2_HOME_DIR="$HOME/.pm2"
+fi
+PM2_LOGS_DIR="$PM2_HOME_DIR/logs"
+
 if [ -d "$PM2_LOGS_DIR" ]; then
+    echo "检测到 PM2 日志目录: $PM2_LOGS_DIR"
     read -p "是否清理 PM2 日志文件？(y/N) " -n 1 -r
     echo # (optional) move to a new line
     if [[ $REPLY =~ ^[Yy]$ ]]; then
