@@ -1,4 +1,3 @@
-# RSSHub 一键后端部署(非Docker)
 #!/bin/bash
 
 # 检查是否以root用户运行
@@ -10,7 +9,7 @@ fi
 echo "--- RSSHub Debian 非 Docker 一键部署脚本 ---"
 echo "此脚本将安装 RSSHub 及其依赖，并使用 PM2 进行进程管理。"
 echo "-------------------------------------------------"
-echo
+
 # 1. 更新系统软件包
 echo ">>> 1. 正在更新系统软件包..."
 apt update && apt upgrade -y
@@ -19,7 +18,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 echo "系统软件包更新完成。"
-echo
+
 # 2. 安装基本依赖：git, curl, build-essential
 echo ">>> 2. 正在检查并安装基本依赖 (git, curl, build-essential)..."
 INSTALL_BASIC_DEPS=false
@@ -46,7 +45,7 @@ else
     apt install -y build-essential # 确保 build-essential 存在且是最新的
     echo "基本依赖检查完成。"
 fi
-echo
+
 # 3. 安装 Node.js (LTS 版本)
 echo ">>> 3. 正在检查并安装 Node.js LTS 版本..."
 if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
@@ -71,7 +70,7 @@ else
     node -v
     npm -v
 fi
-echo
+
 # 4. 安装 Chromium (用于支持 puppeteer 依赖的路由)
 echo ">>> 4. 正在检查并安装 Chromium 浏览器 (用于支持需要 puppeteer 的路由)..."
 # 检查 chromium 或 chromium-browser 命令是否存在
@@ -86,7 +85,7 @@ if ! command -v chromium &> /dev/null && ! command -v chromium-browser &> /dev/n
 else
     echo "  Chromium 浏览器已安装。"
 fi
-echo
+
 # 5. 安装 PM2 (Node.js 进程管理工具)
 echo ">>> 5. 正在检查并安装 PM2 (Node.js 进程管理工具)..."
 if ! command -v pm2 &> /dev/null; then
@@ -100,7 +99,7 @@ if ! command -v pm2 &> /dev/null; then
 else
     echo "  PM2 已安装。"
 fi
-echo
+
 # 6. 下载或更新 RSSHub 源码
 echo ">>> 6. 正在下载/更新 RSSHub 源码到 /opt/RSSHub..."
 RSSHUB_DIR="/opt/RSSHub"
@@ -117,43 +116,55 @@ else
     cd "$RSSHUB_DIR"
 fi
 echo "RSSHub 源码下载/更新完成。"
-echo
-# 7. 安装 RSSHub 依赖
+
+# 7. 安装 RSSHub 依赖 (安装所有依赖，包括开发依赖)
 echo ">>> 7. 正在安装 RSSHub 项目所有依赖 (包括开发依赖)..."
-# 将 npm install --production 改为 npm install
+# 确保在正确的目录下执行安装
+cd "$RSSHUB_DIR"
 npm install
 if [ $? -ne 0 ]; then
     echo "错误：RSSHub 依赖安装失败。"
     exit 1
 fi
 echo "RSSHub 依赖安装完成。"
-echo
+
 # 8. 编译 RSSHub
 echo ">>> 8. 正在编译 RSSHub..."
+# 确保在正确的目录下执行编译
+cd "$RSSHUB_DIR"
 npm run build
 if [ $? -ne 0 ]; then
     echo "错误：RSSHub 编译失败。"
+    echo "请检查上方的编译错误信息以获取更多详情。"
     exit 1
 fi
 echo "RSSHub 编译完成。"
-echo "-------------------------------------------------"
+
+# 检查编译产物是否存在
+if [ ! -f "$RSSHUB_DIR/lib/index.js" ]; then
+    echo "错误：编译完成但未找到 /opt/RSSHub/lib/index.js 文件。"
+    echo "这可能意味着编译过程没有正确生成预期的启动文件。"
+    echo "请手动检查 /opt/RSSHub/lib/ 目录内容，确认 index.js 是否存在。"
+    exit 1
+fi
+echo "已确认编译产物 /opt/RSSHub/lib/index.js 存在。"
+
+
 # 9. 启动 RSSHub (使用 PM2)
 echo ">>> 9. 正在使用 PM2 启动 RSSHub..."
-# 检查是否已存在名为 rsshub 的 pm2 进程
-pm2 describe rsshub > /dev/null
-if [ $? -eq 0 ]; then
-    echo "PM2 中已存在名为 'rsshub' 的进程，将尝试重启。"
-    pm2 restart rsshub
-else
-    # 使用 npm run start 启动，更符合项目定义
-    echo "PM2 中未找到 'rsshub' 进程，将尝试启动新进程。"
-    pm2 start npm --name rsshub -- run start
-fi
+# 确保在启动前清除旧的PM2进程，避免冲突
+pm2 stop rsshub 2>/dev/null
+pm2 delete rsshub 2>/dev/null
+
+# 直接启动编译后的 JavaScript 文件，并指定工作目录
+pm2 start "$RSSHUB_DIR/lib/index.js" --name rsshub --cwd "$RSSHUB_DIR"
 
 if [ $? -ne 0 ]; then
     echo "错误：RSSHub 启动失败，请检查日志。"
     exit 1
 fi
+
+# 配置 PM2 开机自启和保存进程列表
 pm2 save # 保存当前进程列表
 pm2 startup systemd # 配置 PM2 开机自启
 echo "RSSHub 已成功启动并设置为开机自启。"
@@ -167,6 +178,7 @@ if command -v ufw &> /dev/null; then
     echo "  UFW 防火墙已配置并启用，1200 端口已放行。"
 else
     echo "  未检测到 UFW 防火墙，请手动确保 1200 端口已开放。"
+    echo "  例如，对于 Debian 10+，可以使用 'sudo apt install ufw' 安装，然后运行 'sudo ufw allow 1200/tcp && sudo ufw enable'。"
 fi
 
 # 11. 提示信息
