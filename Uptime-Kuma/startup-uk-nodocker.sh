@@ -42,7 +42,7 @@ pm2 install pm2-logrotate
 echo
 echo "===== 启动 Uptime Kuma 服务 ====="
 pm2 delete uptime-kuma || true
-pm2 start /root/uptime-kuma/server/server.js --name     uptime-kuma -- --port "$UK_PORT"
+pm2 start /root/uptime-kuma/server/server.js --name uptime-kuma -- --port "$UK_PORT"
 
 echo
 echo "===== 配置 PM2 开机自启 ====="
@@ -61,7 +61,7 @@ cat <<EOF
 永久修改端口：
   pm2 stop uptime-kuma
   pm2 delete uptime-kuma
-  pm2 start server/server.js --name uptime-kuma -- --port 30000
+  pm2 start /root/uptime-kuma/server/server.js --name uptime-kuma -- --port 30000
   pm2 save
 
 查看状态与日志：
