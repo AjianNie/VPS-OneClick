@@ -50,7 +50,7 @@ else
 fi
 
 # 3. 安装 Node.js (LTS 版本)
-echo ">>> 3. 正在检查并安装 Node.js LTS 版本..."
+echo ">>> 3. 正在检查并安装 Node.js LTS 版本 (包含 npm)..."
 if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
     echo "  Node.js 或 npm 未安装，正在安装 Node.js LTS 版本..."
     # 添加 NodeSource APT 仓库
@@ -67,17 +67,17 @@ if ! command -v node &> /dev/null || ! command -v npm &> /dev/null; then
     fi
     echo "Node.js 安装完成。版本信息："
     node -v
-    npm -v
+    npm -v # 保留 npm 版本信息，因为它随 Node.js 一起安装
 else
     echo "  Node.js 和 npm 已安装。版本信息："
     node -v
     npm -v
 fi
 
-# 4. 安装 pnpm (替代 npm 进行依赖管理和构建)
-echo ">>> 4. 正在检查并安装 pnpm (高性能包管理器)..."
+# 4. 安装 pnpm (替代 npm 进行项目依赖管理和构建)
+echo ">>> 4. 正在检查并安装 pnpm (高性能包管理器，通过 npm 安装)..."
 if ! command -v pnpm &> /dev/null; then
-    echo "  pnpm 未安装，正在安装..."
+    echo "  pnpm 未安装，正在通过 npm 全局安装 pnpm..."
     npm install -g pnpm
     if [ $? -ne 0 ]; then
         echo "错误：pnpm 安装失败。"
@@ -229,7 +229,6 @@ echo "   \`\`\`"
 echo "   修改 \`.env\` 文件后，请运行 \`cd $RSSHUB_DIR && pm2 restart rsshub\` 使配置生效。"
 echo "3. **更新 RSSHub**：进入 \`$RSSHUB_DIR\` 目录，执行以下命令以更新到最新版本并重启："
 echo "   \`git pull && pnpm install --production && pnpm build && pm2 restart rsshub\`"
-echo "   注意：这里将 `npm install --production` 改为 `pnpm install --production`，因为我们现在使用 pnpm。"
 echo "4. **查看 RSSHub 运行状态**：\`pm2 status\`"
 echo "5. **查看 RSSHub 日志**：\`pm2 logs rsshub\`"
 echo "6. 此脚本未包含 Nginx 等反向代理配置，如需通过 80/443 端口访问并配置 HTTPS，请自行配置 Nginx 或 Caddy。"
