@@ -6,7 +6,7 @@ echo "例如：docker stop uptime-kuma"
 echo "---------------"
 echo "预备工作："
 echo "先将uptime-kuma/data数据包压缩，重命名为“data.tar.gz”，再上传到root文件夹下"
-read -p "准备好后回车确认"
+# read -p "准备好后回车确认"
 echo "------------------------------"
 echo "开始迁移数据…"
 
