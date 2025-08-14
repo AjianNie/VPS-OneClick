@@ -70,11 +70,12 @@ npm install
 echo ">>> 编译 RSSHub..."
 npm run build
 
-# 9. 写入 .env 环境变量 （覆盖原文件）
-echo ">>> 写入环境变量配置 (.env)..."
-cat > .env <<EOF
-PORT=$PORT
-EOF
+# 9. 修改端口信息而不影响其他 .env 环境变量
+# 先删除旧 PORT 行
+grep -v '^PORT=' .env > .env.tmp && mv .env.tmp .env
+# 再追加新 PORT
+echo "PORT=$PORT" >> .env
+
 # 如果有 Puppeteer 路径，追加 CHROMIUM_EXECUTABLE_PATH
 if [ -n "$PUPPETER_PATH" ]; then
   echo "CHROMIUM_EXECUTABLE_PATH=$PUPPETER_PATH" >> .env
