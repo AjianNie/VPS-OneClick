@@ -53,6 +53,21 @@ else
   echo ">>> pm2 $(pm2 -v) 已安装"
 fi
 
+# 安装并配置 pm2-logrotate 模块
+echo
+echo "==> 安装 pm2-logrotate 模块以管理日志轮转…"
+sudo pm2 install pm2-logrotate
+
+echo "==> 配置 pm2-logrotate 模块…"
+# 达到10mb开始轮转 (默认就是10M，但为了明确，可以显式设置)
+pm2 set pm2-logrotate:max_size 10M
+# 保留最近7个旧日志文件
+pm2 set pm2-logrotate:retain 7
+# 启用压缩旧日志文件
+pm2 set pm2-logrotate:compress true
+# 检查间隔为5分钟 (300秒)
+pm2 set pm2-logrotate:worker_interval 300
+
 # 6. 克隆或更新 RSSHub 源码
 if [ -d RSSHub ]; then
   echo ">>> RSSHub 源码目录已存在，执行更新..."
