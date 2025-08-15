@@ -60,7 +60,7 @@ echo
 echo "==> 安装 pm2 全局包…"
 sudo npm install -g pm2
 
-# 检查 Python 3 是否安装以及版本是否符合要求
+# 5. 检查 Python 3 环境
 echo
 echo "==> 检查 Python 3 环境…"
 if ! command -v python3 &> /dev/null; then
@@ -82,7 +82,7 @@ else
 fi
 
 
-# 5. 创建项目目录与虚拟环境
+# 6. 创建项目目录与虚拟环境
 PROJECT_DIR="$HOME/rsstt"
 echo
 echo "==> 创建项目目录并初始化虚拟环境：$PROJECT_DIR"
@@ -91,18 +91,18 @@ cd "$PROJECT_DIR"
 python3 -m venv venv
 source venv/bin/activate
 
-# 6. 安装与升级核心 Python 包
+# 7. 安装与升级核心 Python 包
 echo
 echo "==> 升级 pip、安装 rsstt…"
 pip install --upgrade pip setuptools wheel
 pip install rsstt
 
-# 7. 配置环境变量文件
-ENV_DIR="$HOME/.rsstt"
-ENV_FILE="$ENV_DIR/.env"
+# 8. 配置环境变量文件
+# 改变：将 .env 文件直接创建在项目目录中，以便 rsstt 自动加载
+ENV_FILE="$PROJECT_DIR/.env" # 注意这里路径的改变
 echo
 echo "==> 写入环境变量到 $ENV_FILE"
-mkdir -p "$ENV_DIR"
+# 确保项目目录存在，上面已经创建了
 cat > "$ENV_FILE" <<EOF
 # RSS-to-Telegram-Bot Configuration
 
@@ -111,18 +111,13 @@ MANAGER=${MANAGER_ID}
 TELEGRAPH_TOKEN=${TELEGRAPH_TOKENS}
 EOF
 
-# 8. 使用 pm2 启动服务
+# 9. 使用 pm2 启动服务
 echo "==> 使用 pm2 启动 rsstt 服务…"
 
-# 确保 pm2 能够找到环境变量文件
-# pm2 启动时默认不会加载用户的 .bashrc 或 .profile，需要显式指定 EnvironmentFile
-# 或者直接在 pm2 start 命令中设置环境变量，但为了保持 .env 文件管理，我们让 pm2 读取它
-# 注意：pm2 默认不支持直接读取 .env 文件，需要借助 ecosystem.config.js 或在启动命令中指定
-# 这里我们选择在启动命令中直接指定环境变量，因为 .env 文件内容简单且固定。
-# 如果 .env 文件内容复杂，可以考虑创建 ecosystem.config.js
+# 移除 --env-file 参数，因为 rsstt 会在其工作目录自动查找 .env
 pm2 start "$PROJECT_DIR/venv/bin/python3" --name "rsstt" -- \
     -m rsstt \
-    --env-file "$ENV_FILE" # rsstt 命令行工具支持 --env-file 参数来加载环境变量
+    --cwd "$PROJECT_DIR" # 显式设置工作目录，确保rsstt在正确位置查找.env
 
 # 确保 pm2 进程在系统重启后自动启动
 echo "==> 配置 pm2 开机自启…"
