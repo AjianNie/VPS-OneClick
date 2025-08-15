@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 echo "==========================================="
 echo "在 Debian 服务器上一键安装并配置 RSS-to-Telegram-Bot"
-echo "PyPI 版 + pm2 后台服务 (含日志轮转)"
+echo "PyPI 版 + pm2 后台服务 (含自定义日志轮转)"
 echo "原文:https://github.com/Rongronggg9/RSS-to-Telegram-Bot/blob/dev/docs/deployment-guide.md"
 echo "==========================================="
 
@@ -63,17 +63,20 @@ echo
 echo "==> 安装 pm2 全局包…"
 sudo npm install -g pm2
 
-# 5. 安装 pm2-logrotate 模块
+# 5. 安装并配置 pm2-logrotate 模块
 echo
 echo "==> 安装 pm2-logrotate 模块以管理日志轮转…"
 sudo pm2 install pm2-logrotate
 
-# 配置 pm2-logrotate (可选，默认配置通常够用)
-# 可以根据需要调整，例如：
-# pm2 set pm2-logrotate:max_size 10M # 单个日志文件最大10MB
-# pm2 set pm2-logrotate:retain 7    # 保留7个旧日志文件
-# pm2 set pm2-logrotate:compress true # 压缩旧日志文件
-# pm2 set pm2-logrotate:interval 0 0 * * * # 每天午夜轮转
+echo "==> 配置 pm2-logrotate 模块…"
+# 达到10mb开始轮转 (默认就是10M，但为了明确，可以显式设置)
+pm2 set pm2-logrotate:max_size 10M
+# 保留最近7个旧日志文件
+pm2 set pm2-logrotate:retain 7
+# 启用压缩旧日志文件
+pm2 set pm2-logrotate:compress true
+# 检查间隔为5分钟 (300秒)
+pm2 set pm2-logrotate:worker_interval 300
 
 # 6. 检查 Python 3 环境
 echo
@@ -126,8 +129,6 @@ EOF
 
 # 10. 使用 pm2 启动服务
 echo "==> 使用 pm2 启动 rsstt 服务…"
-# 确保在启动前切换到项目目录，或者在pm2命令中使用 --cwd 参数
-# 这里我们使用 --cwd 参数，因为它更健壮，不依赖于脚本当前的cd状态
 pm2 start "$PROJECT_DIR/venv/bin/python3" --name "rsstt" --cwd "$PROJECT_DIR" -- -m rsstt
 
 # 确保 pm2 进程在系统重启后自动启动
@@ -138,7 +139,7 @@ pm2 startup systemd # 或者 pm2 startup init.d，取决于你的系统
 echo
 echo "==========================================="
 echo "RSS-to-Telegram-Bot 安装完成！"
-echo "服务已通过 pm2 启动，并配置了日志轮转。"
+echo "服务已通过 pm2 启动，并配置了自定义日志轮转。"
 echo "==========================================="
 echo "常用命令："
 echo "查看实时日志：pm2 logs rsstt"
