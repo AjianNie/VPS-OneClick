@@ -4,6 +4,7 @@ echo "停止Docker服务..."
 sudo systemctl stop docker.socket
 sudo systemctl stop docker
 
+
 echo "卸载Docker相关软件包..."
 sudo apt purge -y docker-ce docker-ce-cli containerd.io docker docker-engine docker.io runc
 
