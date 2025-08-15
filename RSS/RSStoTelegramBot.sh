@@ -1,9 +1,21 @@
 #!/usr/bin/env bash
 echo "==========================================="
 echo "在 Debian 服务器上一键安装并配置 RSS-to-Telegram-Bot"
-echo "PyPI 版 + systemd 后台服务"
+echo "PyPI 版 + pm2 后台服务"
 echo "原文:https://github.com/Rongronggg9/RSS-to-Telegram-Bot/blob/dev/docs/deployment-guide.md"
 echo "==========================================="
+
+# 检测是否已安装 RSS-to-Telegram-Bot
+if pm2 list | grep -q "rsstt"; then
+    echo "检测到 RSS-to-Telegram-Bot (rsstt) 已经通过 pm2 安装并运行。"
+    echo "如果您想重新安装，请先手动停止并删除现有的 pm2 进程："
+    echo "pm2 stop rsstt"
+    echo "pm2 delete rsstt"
+    echo "然后删除项目目录：rm -rf $HOME/rsstt"
+    echo "最后重新运行此脚本。"
+    exit 0
+fi
+
 echo "开始前，您还需要："
 echo "1. 从 @BotFather 新建机器人并获取Token"
 echo "2. 从 @userinfobot 获取您的 Telegram ID"
@@ -26,14 +38,51 @@ echo
 echo "==> 更新系统并安装基础工具…"
 sudo apt update
 sudo apt upgrade -y
-sudo apt install -y python3 python3-pip python3-venv wget
+sudo apt install -y python3 python3-pip python3-venv wget curl
 
 # 2. （可选）安装中文字体用于 HTML 表格渲染
 echo
 echo "==> 默认安装中文字体以支持表格渲染…"
 sudo apt install -y fonts-wqy-microhei
 
-# 4. 创建项目目录与虚拟环境
+# 3. 安装 Node.js 和 npm (用于安装 pm2)
+echo
+echo "==> 安装 Node.js 和 npm (如果未安装)…"
+if ! command -v node &> /dev/null; then
+    curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+    sudo apt-get install -y nodejs
+else
+    echo "Node.js 已安装。"
+fi
+
+# 4. 安装 pm2
+echo
+echo "==> 安装 pm2 全局包…"
+sudo npm install -g pm2
+
+# 检查 Python 3 是否安装以及版本是否符合要求
+echo
+echo "==> 检查 Python 3 环境…"
+if ! command -v python3 &> /dev/null; then
+    echo "错误：未找到 python3 命令。请确保 Python 3 已正确安装。"
+    exit 1
+fi
+
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+REQUIRED_MAJOR=3
+REQUIRED_MINOR=6 # rsstt 通常要求 Python 3.6+，这里可以根据实际需求调整
+
+if (( $(echo "$PYTHON_VERSION" | cut -d'.' -f1) < $REQUIRED_MAJOR )) || \
+   (( $(echo "$PYTHON_VERSION" | cut -d'.' -f1) == $REQUIRED_MAJOR && $(echo "$PYTHON_VERSION" | cut -d'.' -f2) < $REQUIRED_MINOR )); then
+    echo "错误：检测到 Python 版本为 $PYTHON_VERSION，但 RSS-to-Telegram-Bot 至少需要 Python ${REQUIRED_MAJOR}.${REQUIRED_MINOR}。"
+    echo "请升级您的 Python 版本。"
+    exit 1
+else
+    echo "检测到 Python 版本为 $PYTHON_VERSION，符合要求。"
+fi
+
+
+# 5. 创建项目目录与虚拟环境
 PROJECT_DIR="$HOME/rsstt"
 echo
 echo "==> 创建项目目录并初始化虚拟环境：$PROJECT_DIR"
@@ -42,13 +91,13 @@ cd "$PROJECT_DIR"
 python3 -m venv venv
 source venv/bin/activate
 
-# 5. 安装与升级核心 Python 包
+# 6. 安装与升级核心 Python 包
 echo
 echo "==> 升级 pip、安装 rsstt…"
 pip install --upgrade pip setuptools wheel
 pip install rsstt
 
-# 6. 配置环境变量文件
+# 7. 配置环境变量文件
 ENV_DIR="$HOME/.rsstt"
 ENV_FILE="$ENV_DIR/.env"
 echo
@@ -62,34 +111,28 @@ MANAGER=${MANAGER_ID}
 TELEGRAPH_TOKEN=${TELEGRAPH_TOKENS}
 EOF
 
-# 7. 创建 systemd 服务单元
-SERVICE_FILE="/etc/systemd/system/rsstt.service"
-echo
-echo "==> 创建 systemd 服务文件：$SERVICE_FILE"
-sudo tee "$SERVICE_FILE" > /dev/null <<EOF
-[Unit]
-Description=RSS-to-Telegram-Bot Service
-After=network.target
+# 8. 使用 pm2 启动服务
+echo "==> 使用 pm2 启动 rsstt 服务…"
 
-[Service]
-Type=simple
-User=$USER
-WorkingDirectory=$PROJECT_DIR
-ExecStart=$PROJECT_DIR/venv/bin/python3 -m rsstt
-Restart=on-failure
-EnvironmentFile=$ENV_FILE
+# 确保 pm2 能够找到环境变量文件
+# pm2 启动时默认不会加载用户的 .bashrc 或 .profile，需要显式指定 EnvironmentFile
+# 或者直接在 pm2 start 命令中设置环境变量，但为了保持 .env 文件管理，我们让 pm2 读取它
+# 注意：pm2 默认不支持直接读取 .env 文件，需要借助 ecosystem.config.js 或在启动命令中指定
+# 这里我们选择在启动命令中直接指定环境变量，因为 .env 文件内容简单且固定。
+# 如果 .env 文件内容复杂，可以考虑创建 ecosystem.config.js
+pm2 start "$PROJECT_DIR/venv/bin/python3" --name "rsstt" -- \
+    -m rsstt \
+    --env-file "$ENV_FILE" # rsstt 命令行工具支持 --env-file 参数来加载环境变量
 
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# 8. 启用并启动服务
-echo "==> 重新加载 systemd、启用并启动 rsstt 服务…"
-sudo systemctl daemon-reload
-sudo systemctl enable rsstt
-sudo systemctl start rsstt
+# 确保 pm2 进程在系统重启后自动启动
+echo "==> 配置 pm2 开机自启…"
+pm2 save
+pm2 startup systemd # 或者 pm2 startup init.d，取决于你的系统
 
 echo
 echo "安装完成！"
-echo "可通过 'sudo journalctl -u rsstt -f' 查看实时日志。"
-echo "运行状态：sudo systemctl status rsstt"
+echo "可通过 'pm2 logs rsstt' 查看实时日志。"
+echo "运行状态：pm2 status"
+echo "停止服务：pm2 stop rsstt"
+echo "删除服务：pm2 delete rsstt"
+echo "开机自启配置：pm2 startup"
