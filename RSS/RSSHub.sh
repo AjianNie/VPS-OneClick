@@ -49,8 +49,34 @@ fi
 if ! command -v pnpm >/dev/null; then
   echo ">>> 安装 pnpm..."
   curl -fsSL https://get.pnpm.io/install.sh | sh -
-  export PATH="$HOME/.local/share/pnpm:$PATH"
+
+  # pnpm install.sh 脚本通常会尝试自动将 PNPM_HOME 添加到PATH
+  # 但为了确保在当前会话中立即生效，我们手动添加
+  # 注意：PNPM_HOME 的默认位置可能是 ~/.local/share/pnpm
+  # 也可以是 ~/.pnpm，取决于 pnpm 版本和系统
+  # 更好的做法是让 pnpm setup 来处理 PATH
+  
+  # 运行 pnpm setup 来创建全局 bin 目录并配置环境变量
+  # pnpm setup 会提示用户将配置添加到 .bashrc 或 .zshrc
+  # 并且在执行后，会打印出需要 source 的文件路径
+  pnpm setup
+
+  # pnpm setup 完成后，它会告诉你需要 source 哪个文件
+  # 通常是 ~/.bashrc 或 ~/.profile
+  # 为了确保在当前脚本会话中立即生效，我们需要执行它
+  # 最好是根据 pnpm setup 的输出或者预期路径来 source
+  # 这里我们假设它会添加到 ~/.bashrc
+  if [ -f "$HOME/.bashrc" ]; then
+    source "$HOME/.bashrc"
+  elif [ -f "$HOME/.profile" ]; then
+    source "$HOME/.profile"
+  fi
+
+  echo "pnpm 安装完成并配置。"
+else
+  echo "pnpm 已安装。"
 fi
+
 
 # 5. 安装pm2（pnpm全局）
 if ! command -v pm2 >/dev/null; then
