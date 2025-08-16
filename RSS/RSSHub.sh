@@ -48,28 +48,46 @@ fi
 # 4. 安装pnpm（如未装）
 if ! command -v pnpm >/dev/null; then
   echo ">>> 安装 pnpm..."
+  
+  # 1. 下载并运行 pnpm 安装脚本
   curl -fsSL https://get.pnpm.io/install.sh | sh -
 
-  # pnpm install.sh 脚本通常会尝试自动将 PNPM_HOME 添加到PATH
-  # 但为了确保在当前会话中立即生效，我们手动添加
-  # 注意：PNPM_HOME 的默认位置可能是 ~/.local/share/pnpm
-  # 也可以是 ~/.pnpm，取决于 pnpm 版本和系统
-  # 更好的做法是让 pnpm setup 来处理 PATH
-  
-  # 运行 pnpm setup 来创建全局 bin 目录并配置环境变量
+  # 2. 运行 pnpm setup 来配置全局目录和环境变量
   # pnpm setup 会提示用户将配置添加到 .bashrc 或 .zshrc
   # 并且在执行后，会打印出需要 source 的文件路径
   pnpm setup
 
-  # pnpm setup 完成后，它会告诉你需要 source 哪个文件
-  # 通常是 ~/.bashrc 或 ~/.profile
-  # 为了确保在当前脚本会话中立即生效，我们需要执行它
-  # 最好是根据 pnpm setup 的输出或者预期路径来 source
-  # 这里我们假设它会添加到 ~/.bashrc
+  # 3. 确定 pnpm setup 写入的配置文件并 source 它
+  # pnpm setup 可能会将 PNPM_HOME 设置在 ~/.bashrc, ~/.profile, ~/.zshrc 等
+  # 检查这些文件，并 source 最可能被修改的那个
+  # 优先检查 .bashrc，因为这是最常见的
   if [ -f "$HOME/.bashrc" ]; then
+    echo ">>> Sourcing $HOME/.bashrc for pnpm environment..."
     source "$HOME/.bashrc"
   elif [ -f "$HOME/.profile" ]; then
+    echo ">>> Sourcing $HOME/.profile for pnpm environment..."
     source "$HOME/.profile"
+  elif [ -f "$HOME/.zshrc" ]; then # 如果你可能使用zsh
+    echo ">>> Sourcing $HOME/.zshrc for pnpm environment..."
+    source "$HOME/.zshrc"
+  fi
+  # 如果是 root 用户，并且上述路径未能生效，可以尝试明确 source /root/.bashrc
+  # 但通常 $HOME/.bashrc 已经足够
+  # if [ "$EUID" -eq 0 ] && [ -f "/root/.bashrc" ]; then
+  #   echo ">>> Sourcing /root/.bashrc for pnpm environment (as root)..."
+  #   source "/root/.bashrc"
+  # fi
+
+  # 4. 再次检查 pnpm 是否在 PATH 中
+  # 这一步是关键，确保 pnpm 命令在脚本的后续部分可用
+  if ! command -v pnpm >/dev/null; then
+    echo "!!! 警告: pnpm 仍然无法找到。尝试手动添加 PATH。"
+    # 假设 pnpm 默认安装到 ~/.local/share/pnpm
+    export PATH="$HOME/.local/share/pnpm:$PATH"
+    if ! command -v pnpm >/dev/null; then
+      echo "!!! 错误: 即使手动添加 PATH，pnpm 仍然无法找到。请检查安装。"
+      exit 1 # 退出脚本，因为 pnpm 无法使用
+    fi
   fi
 
   echo "pnpm 安装完成并配置。"
