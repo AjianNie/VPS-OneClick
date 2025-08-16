@@ -28,12 +28,24 @@ set -e
 read -p "请输入 RSSHub 监听端口（回车默认1200）: " PORT
 PORT=${PORT:-1200}
 
-# 2. 安装Node.js 18.x（pnpm与pm2需要）
-if ! command -v node >/dev/null; then
-  echo ">>> 安装Node.js 18.x ..."
-  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# 2. 安装Node.js 22.x（pnpm与pm2需要）
+# 检查 Node.js 版本，自动升级到 22.x（适用于Debian/Ubuntu）
+
+REQUIRED_NODE_VER=22
+
+CURRENT_NODE_VER="$(node -v 2>/dev/null | grep -oP '\d+' | head -1)"
+
+if [ -z "$CURRENT_NODE_VER" ] || [ "$CURRENT_NODE_VER" -lt "$REQUIRED_NODE_VER" ]; then
+  echo ">>> 当前 Node.js 版本为 ${CURRENT_NODE_VER:-未安装}，需要安装/升级到 v${REQUIRED_NODE_VER}.x"
+  sudo apt purge -y nodejs
+  sudo apt autoremove -y
+  curl -fsSL https://deb.nodesource.com/setup_${REQUIRED_NODE_VER}.x | sudo -E bash -
   sudo apt install -y nodejs
+  echo ">>> Node.js 已升级完成，当前版本：$(node -v)"
+else
+  echo ">>> 检测到 Node.js 已符合要求（$(node -v)），无需安装。"
 fi
+
 
 # 3. 安装pnpm（如未装）
 if ! command -v pnpm >/dev/null; then
