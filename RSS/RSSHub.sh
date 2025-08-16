@@ -37,24 +37,26 @@ fi
 
 # 3. 安装pnpm（如未装）
 if ! command -v pnpm >/dev/null; then
-  echo ">>> 安装 pnpm..."
+  echo ">>> 检测到未安装 pnpm，开始安装..."
   curl -fsSL https://get.pnpm.io/install.sh | sh -
-  # 让当前 shell 立即生效，适配普通用户及 root
+
   if [ "$EUID" -eq 0 ]; then
     export PNPM_HOME="/root/.local/share/pnpm"
   else
     export PNPM_HOME="$HOME/.local/share/pnpm"
   fi
   export PATH="$PNPM_HOME:$PATH"
-  # 再次检查 pnpm 是否可见
+
   if ! command -v pnpm >/dev/null; then
-    echo "!!! 错误: pnpm 安装后仍不可用，请手动加入 PATH: export PATH=\"\$PNPM_HOME:\$PATH\""
+    echo "❌ 错误：pnpm 安装成功但命令不可用，请检查 PATH 设置。"
     exit 1
   fi
+
   echo "pnpm 安装完成并配置。"
 else
-  echo "pnpm 已安装。"
+  echo ">>> 已检测到 pnpm 已安装，跳过安装。"
 fi
+
 
 
 # 4. 安装pm2（pnpm全局）
