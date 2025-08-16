@@ -1,13 +1,25 @@
 #!/bin/bash
 
-# install_rsshub.sh — 一键手动部署 RSSHub（Debian）
-# 功能：
-#  1. 交互设置监听端口（默认1200）
-#  2. 安装 Node.js、Git、Chromium（ARM/ARM64 系统）等依赖
-#  3. 安装 pm2 进程管理器，避免重复安装
-#  4. 克隆或更新 RSSHub 源码，安装依赖并编译
-#  5. 启动 RSSHub 并设置开机自启
-#  6. 完成后提示 .env 配置示例与说明
+echo "==========================================="
+echo "全量pnpm一键部署RSSHub（Debian）"
+echo "注意：因npm自身缺陷以及会导致编译失败，若非必要，建议彻底卸载npm/node相关依赖，并仅用pnpm管理，含pm2进程管理"
+
+read -p "是否彻底清除 npm 及其相关依赖？(Y/N，默认N): " uninstall_npm
+uninstall_npm=${uninstall_npm:-N}
+
+if [[ "$uninstall_npm" =~ ^[Yy]$ ]]; then
+  echo ">>> 卸载 npm 及相关依赖..."
+  sudo apt purge -y npm nodejs
+  sudo apt autoremove -y
+  sudo rm -rf /usr/local/lib/node_modules/npm
+  sudo rm -rf /usr/local/bin/npm
+  sudo rm -rf /usr/bin/npm
+  sudo rm -rf /usr/local/bin/pm2
+  sudo rm -rf /usr/bin/pm2
+else
+  echo ">>> 保留现有 npm 及相关依赖"
+fi
+
 
 set -e
 
@@ -15,8 +27,37 @@ set -e
 read -p "请输入 RSSHub 监听端口（回车默认1200）: " PORT
 PORT=${PORT:-1200}
 
-# 2. 安装基础工具：git、curl、build-essential
-echo ">>> 安装基础工具 git、curl、build-essential（如已安装将跳过）..."
+# 2. 卸载npm及相关依赖（含旧pm2）
+echo ">>> 卸载 npm 及相关依赖..."
+sudo apt purge -y npm nodejs
+sudo apt autoremove -y
+sudo rm -rf /usr/local/lib/node_modules/npm
+sudo rm -rf /usr/local/bin/npm
+sudo rm -rf /usr/bin/npm
+sudo rm -rf /usr/local/bin/pm2
+sudo rm -rf /usr/bin/pm2
+
+# 3. 安装Node.js 18.x（pnpm与pm2需要）
+if ! command -v node >/dev/null; then
+  echo ">>> 安装Node.js 18.x ..."
+  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+  sudo apt install -y nodejs
+fi
+
+# 4. 安装pnpm（如未装）
+if ! command -v pnpm >/dev/null; then
+  echo ">>> 安装 pnpm..."
+  curl -fsSL https://get.pnpm.io/install.sh | sh -
+  export PATH="$HOME/.local/share/pnpm:$PATH"
+fi
+
+# 5. 安装pm2（pnpm全局）
+if ! command -v pm2 >/dev/null; then
+  echo ">>> 使用 pnpm 安装 pm2..."
+  pnpm add -g pm2
+fi
+
+# 6. 安装基础工具
 for pkg in git curl build-essential; do
   if ! dpkg -s "$pkg" &>/dev/null; then
     sudo apt update && sudo apt install -y "$pkg"
@@ -25,125 +66,63 @@ for pkg in git curl build-essential; do
   fi
 done
 
-# 3. 安装 Node.js 18.x（如已安装将跳过）
-if ! command -v node >/dev/null || [[ "$(node -v)" != v1?* ]]; then
-  echo ">>> 安装 Node.js 18.x..."
-  curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
-  sudo apt install -y nodejs
-else
-  echo ">>> Node.js $(node -v) 已安装"
-fi
-
-# 4. 检测系统架构并安装 Puppeteer 依赖（仅 ARM/ARM64 系统）
+# 7. Puppeteer依赖（仅ARM/ARM64）
 ARCH=$(dpkg --print-architecture)
 if [[ "$ARCH" =~ ^arm64$|^armhf$ ]]; then
-  echo ">>> 检测到 ARM 架构 ($ARCH)，安装 Chromium 供 Puppeteer 使用..."
+  echo ">>> ARM架构，安装Chromium ..."
   sudo apt install -y chromium
   PUPPETER_PATH=$(command -v chromium || command -v chromium-browser)
 else
-  echo ">>> 非 ARM 架构 ($ARCH)，跳过 Puppeteer 依赖安装"
+  echo ">>> 非ARM架构，无需安装Chromium"
   PUPPETER_PATH=""
 fi
 
-# 5. 安装 pm2（如已安装将跳过）
-if ! command -v pm2 >/dev/null; then
-  echo ">>> 安装 pm2 进程管理器..."
-  sudo npm install -g pm2
-else
-  echo ">>> pm2 $(pm2 -v) 已安装"
-fi
-
-# 安装并配置 pm2-logrotate 模块
-echo
-echo "==> 安装 pm2-logrotate 模块以管理日志轮转…"
-sudo pm2 install pm2-logrotate
-
-echo "==> 配置 pm2-logrotate 模块…"
-# 达到10mb开始轮转 (默认就是10M，但为了明确，可以显式设置)
-pm2 set pm2-logrotate:max_size 10M
-# 保留最近7个旧日志文件
-pm2 set pm2-logrotate:retain 7
-# 启用压缩旧日志文件
-pm2 set pm2-logrotate:compress true
-# 检查间隔为5分钟 (300秒)
-pm2 set pm2-logrotate:worker_interval 300
-
-# 6. 克隆或更新 RSSHub 源码
+# 8. 克隆或更新RSSHub源码
 if [ -d RSSHub ]; then
-  echo ">>> RSSHub 源码目录已存在，执行更新..."
+  echo ">>> RSSHub目录存在，更新..."
   cd RSSHub && git pull
 else
-  echo ">>> 克隆 RSSHub 源码仓库..."
+  echo ">>> 克隆RSSHub源码..."
   git clone https://github.com/DIYgod/RSSHub.git && cd RSSHub
 fi
 
-# 7. 安装项目依赖
-echo ">>> 安装项目依赖..."
-npm install
+# 9. 用pnpm安装依赖
+echo ">>> 用 pnpm 安装依赖..."
+pnpm install
 
-# 8. 编译项目
-echo ">>> 编译 RSSHub..."
-npm run build
+# 10. 用pnpm编译项目
+echo ">>> 用 pnpm 编译项目..."
+pnpm build
 
-# 9. 修改端口信息而不影响其他 .env 环境变量
-# 先删除旧 PORT 行
-grep -v '^PORT=' .env > .env.tmp && mv .env.tmp .env
-# 再追加新 PORT
-echo "PORT=$PORT" >> .env
-
-# 如果有 Puppeteer 路径，追加 CHROMIUM_EXECUTABLE_PATH
+# 11. 写入 .env 环境变量（覆盖原内容）
+echo ">>> 写入环境变量 .env ..."
+cat > .env <<EOF
+PORT=$PORT
+EOF
 if [ -n "$PUPPETER_PATH" ]; then
   echo "CHROMIUM_EXECUTABLE_PATH=$PUPPETER_PATH" >> .env
 fi
 
-# 10. 用 pm2 启动 RSSHub 服务
-echo ">>> 使用 pm2 启动 RSSHub..."
-pm2 start npm --name rsshub -- start
+# 12. pm2启动RSSHub
+echo ">>> 用 pm2 启动 RSSHub ..."
+pm2 start pnpm --name rsshub -- start
 
-# 11. 设置 pm2 开机自启
-echo ">>> 设置 pm2 开机自启..."
+# 13. pm2设置开机自启
+echo ">>> pm2 开机自启 ..."
 pm2 startup systemd -u "$(whoami)" --hp "$HOME"
 pm2 save
 
-# 12. 完成提示
-echo
-echo ">>> 部署完成！RSSHub 已启动，监听端口：$PORT"
-echo "访问地址： http://$(hostname -I | awk '{print $1}'):$PORT"
-echo "pm2 管理命令示例： pm2 status rsshub | pm2 stop rsshub | pm2 restart rsshub | pm2 logs rsshub"
-echo
-cat <<MESSAGE
+# 14. 完成提示
+echo ""
+echo ">>> 部署完成！RSSHub已开启，监听端口：$PORT"
+echo "访问地址：http://$(hostname -I | awk '{print $1}'):$PORT"
+cat <<TIP
+
 可以通过设置环境变量来配置 RSSHub。在项目根目录新建一个 .env 文件，
 每行以 NAME=VALUE 格式添加环境变量，例如：
 CACHE_TYPE=redis
 CACHE_EXPIRE=600
 
 注意它不会覆盖已有的环境变量，更多规则请参考：https://github.com/motdotla/dotenv
-
-该部署方式不包括 Redis 依赖，如需启用 Redis，请使用 Docker Compose 部署或自行部署外部依赖。
-
-更多部署参考：https://docs.rsshub.app/zh/deploy/
-
-更多自定义的环境变量参考：https://docs.rsshub.app/zh/deploy/config
-MESSAGE
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+该部署方式不包括 redis 依赖，如需启用 Redis，请用 Docker Compose 或自行安装 Redis。
+TIP
