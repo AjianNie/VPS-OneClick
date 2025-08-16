@@ -16,6 +16,7 @@ if [[ "$uninstall_npm" =~ ^[Yy]$ ]]; then
   sudo rm -rf /usr/bin/npm
   sudo rm -rf /usr/local/bin/pm2
   sudo rm -rf /usr/bin/pm2
+  sudo rm -rf /usr/lib/node_modules
 else
   echo ">>> 保留现有 npm 及相关依赖"
 fi
