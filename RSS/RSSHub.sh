@@ -135,7 +135,7 @@ pm2 save
 # 13. 完成提示
 echo ""
 echo ">>> 部署完成！RSSHub已开启，监听端口：$PORT"
-echo "访问地址：http://$(hostname -I | awk '{print $1}'):$PORT"
+echo "访问地址：http://你的主机IP:$PORT"
 cat <<TIP
 
 可以通过设置环境变量来配置 RSSHub。在项目根目录新建一个 .env 文件，
