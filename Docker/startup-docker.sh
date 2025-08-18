@@ -111,8 +111,8 @@ install_docker_china() {
 {
     "log-driver": "json-file",
     "log-opts": {
-        "max-size": "20m",
-        "max-file": "3"
+        "max-size": "5m",
+        "max-file": "5"
     },
     "experimental": true,
     "data-root": "/root/docker_data",
@@ -134,8 +134,8 @@ install_docker_international() {
 {
     "log-driver": "json-file",
     "log-opts": {
-        "max-size": "20m",
-        "max-file": "3"
+        "max-size": "5m",
+        "max-file": "5"
     },
     "ipv6": true,
     "fixed-cidr-v6": "fd00:dead:beef:c0::/80",
