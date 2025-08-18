@@ -6,7 +6,7 @@ NON_ROOT_USER=""
 NON_ROOT_PASSWORD=""
 TCP_PORTS=""
 UDP_PORTS=""
-DEFAULT_TIMEZONE="Asia/Shanghai" # 默认时区为上海
+DEFAULT_TIMEZONE="Asia/Shanghai" # 默认时区为china/shanghai
 
 # --- 函数定义 ---
 
@@ -34,8 +34,6 @@ is_installed() {
 
 # --- 脚本开始 ---
 log_message "--- VPS 基础配置脚本开始 ---"
-
-echo "欢迎使用 VPS 基础配置脚本！"
 echo "所有操作将记录在 $LOG_FILE。"
 echo "请注意：本脚本尽量避免断开终端连接，但某些操作仍有风险，建议在 VNC 控制台运行。"
 echo ""
@@ -184,7 +182,8 @@ fi
 
 # 3. 安装常用工具和实用程序
 echo "--- [3/6] 安装常用工具和实用程序 ---"
-COMMON_TOOLS="htop net-tools curl wget git unzip zip tmux"
+echo "htop (更友好的进程查看器);curl 和 wget (命令行下载工具);git (版本控制工具);unzip 和 zip (文件压缩/解压缩工具);fail2ban (入侵防御系统，防止暴力破解)"
+COMMON_TOOLS="htop curl wget git unzip zip fail2ban"
 for tool in $COMMON_TOOLS; do
     if is_installed "$tool"; then
         log_message "$tool 已安装，跳过安装。"
