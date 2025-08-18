@@ -1,11 +1,11 @@
 #!/bin/bash
 echo "--- Uptime Kuma 非docker安装方式的数据迁移至docker ---"
 echo "------------------------------"
-echo "警告：在运行此脚本前，请确保 Uptime Kuma 容器已停止！"
-echo "例如：docker stop uptime-kuma"
+echo "警告：在运行此脚本前，请确保 Uptime Kuma 容器已停止！docker stop uptime-kuma"
 echo "---------------"
 echo "预备工作："
 echo "先将uptime-kuma/data数据包压缩，重命名为“data.tar.gz”，再上传到root文件夹下"
+echo "根据docker的数据目录，修改路径TARGET_DIR，默认为/var/lib/docker/volumes/uptime-kuma/_data；docker环境部署时若启用了/app/data文件夹的本地挂载（映射）A，则修改路径TARGET_DIR为该路径A"
 # read -p "准备好后回车确认"
 echo "------------------------------"
 echo "开始迁移数据…"
@@ -16,7 +16,7 @@ set -e
 
 # --- 配置变量 ---
 ARCHIVE_PATH="/root/data.tar.gz"                     # 你的压缩包路径
-TARGET_DIR="/var/lib/docker/volumes/uptime-kuma/_data" # Uptime Kuma docker数据卷的宿主机路径
+TARGET_DIR="/root/docker_data/uptime_kuma" # 修改为Uptime Kuma docker数据卷的宿主机路径
 TEMP_EXTRACT_DIR="/tmp/uptime_kuma_restore_temp_$(date +%s)" # 使用时间戳避免临时目录冲突
 
 # 压缩包解压后，我们期望的数据目录路径
