@@ -22,6 +22,8 @@ check_command() {
     else
         log_message "FAILED: $1"
         echo "错误：$1 失败。请检查日志文件 $LOG_FILE 或手动解决问题。"
+        # 这里选择退出以避免脚本未正常执行
+        exit 1
     fi
 }
 
@@ -53,37 +55,34 @@ echo ""
 # 2. 安装并配置防火墙 (iptables)
 echo "--- [2/6] 安装并配置防火墙 (iptables) ---"
 
-if is_installed "iptables"; then
-    log_message "iptables 已安装。"
+if is_installed "iptables" && is_installed "iptables-openrc"; then
+    log_message "iptables 和 iptables-openrc 已安装。"
 else
-    log_message "iptables 未安装，正在安装..."
-    sudo apk add iptables-openrc | tee -a "$LOG_FILE"
-    check_command "apk add iptables-openrc"
+    log_message "iptables 或 iptables-openrc 未安装，正在安装..."
+    sudo apk add iptables iptables-openrc | tee -a "$LOG_FILE"
+    check_command "apk add iptables iptables-openrc"
+fi
+
+# 检查iptables命令是否存在
+if ! command -v iptables >/dev/null 2>&1; then
+    log_message "错误：iptables 命令未找到，安装失败。脚本终止。"
+    echo "错误：iptables 命令未找到，安装失败。"
+    exit 1
 fi
 
 log_message "启用 iptables 服务..."
-
-# 开启iptables服务并开机启动
 sudo rc-update add iptables default
-sudo rc-service iptables start
-check_command "start iptables service"
 
+# 先设置规则，避免启动时报错
 log_message "设置默认防火墙规则：默认拒绝所有传入，允许所有传出..."
-
-# 先清空规则
 sudo iptables -F
 sudo iptables -X
-
-# 默认策略
 sudo iptables -P INPUT DROP
 sudo iptables -P FORWARD DROP
 sudo iptables -P OUTPUT ACCEPT
-
-# 允许已建立和相关连接
 sudo iptables -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
-
-# 允许本地回环接口通信
 sudo iptables -A INPUT -i lo -j ACCEPT
+check_command "iptables default rules set"
 
 # 询问 TCP 端口
 read -p "请输入需要开放的 TCP 端口 (多个端口用空格隔开，例如：22 80 443)：" TCP_PORTS
@@ -121,6 +120,10 @@ fi
 log_message "保存防火墙规则..."
 sudo /etc/init.d/iptables save
 check_command "iptables save"
+
+log_message "启动 iptables 服务..."
+sudo rc-service iptables start
+check_command "start iptables service"
 
 echo "防火墙配置完成。"
 echo ""
@@ -172,7 +175,6 @@ echo ""
 echo "--- [5/6] 配置 SWAP (交换空间) ---"
 read -p "是否配置 SWAP 交换空间？(y/n，小内存 VPS 推荐 y)：" CONFIGURE_SWAP
 if echo "$CONFIGURE_SWAP" | grep -iq "^y"; then
-    # 检查是否已经有swap
     if swapon --show | grep -q '/swapfile'; then
         log_message "SWAP 文件已配置，跳过 SWAP 配置。"
         echo "SWAP 似乎已配置。当前 SWAP 状态："
@@ -180,8 +182,10 @@ if echo "$CONFIGURE_SWAP" | grep -iq "^y"; then
     else
         read -p "请输入 SWAP 大小 (例如：2G，默认为 2G)：" SWAP_SIZE
         SWAP_SIZE=${SWAP_SIZE:-2G}
+        COUNT=$(echo "$SWAP_SIZE" | tr -d 'Gg')
+        COUNT=$((COUNT * 1024))
         log_message "正在创建 $SWAP_SIZE 的 SWAP 文件..."
-        sudo dd if=/dev/zero of=/swapfile bs=1M count=$(echo "$SWAP_SIZE" | tr -d 'Gg' )000 status=progress | tee -a "$LOG_FILE"
+        sudo dd if=/dev/zero of=/swapfile bs=1M count="$COUNT" status=progress | tee -a "$LOG_FILE"
         check_command "dd create swapfile"
 
         sudo chmod 600 /swapfile
@@ -196,7 +200,6 @@ if echo "$CONFIGURE_SWAP" | grep -iq "^y"; then
         echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab | tee -a "$LOG_FILE"
         check_command "add swap to fstab"
 
-        # 调整内核参数，Alpine有时需要调用sysctl.conf
         sudo sysctl -w vm.swappiness=10 | tee -a "$LOG_FILE"
         sudo sysctl -w vm.vfs_cache_pressure=50 | tee -a "$LOG_FILE"
         echo 'vm.swappiness=10' | sudo tee -a /etc/sysctl.conf | tee -a "$LOG_FILE"
@@ -215,19 +218,16 @@ echo ""
 # --- 最终 SSH 安全加固 (创建非 Root 用户并禁用 Root 登录) ---
 echo "--- [最终步骤] SSH 安全加固：创建非 Root 用户并禁用 Root 登录 ---"
 
-# 检查 openssh 是否安装
-if ! is_installed "openssh-server"; then
+if ! is_installed "openssh"; then
     log_message "OpenSSH Server 未安装，尝试安装..."
     sudo apk add openssh | tee -a "$LOG_FILE"
     check_command "install openssh-server"
 fi
 
-# 启用并启动 sshd 服务
 sudo rc-update add sshd default
 sudo rc-service sshd start
 check_command "start sshd"
 
-# 询问创建非 Root 用户
 read -p "是否创建非 Root 用户并禁用 Root 登录？(y/n，强烈推荐 y)：" CREATE_USER_AND_DISABLE_ROOT
 if echo "$CREATE_USER_AND_DISABLE_ROOT" | grep -iq "^y"; then
     read -p "请输入非 Root 用户的用户名和密码 (例如：youruser yourpassword，用空格隔开)：" USER_INPUT
@@ -243,32 +243,26 @@ if echo "$CREATE_USER_AND_DISABLE_ROOT" | grep -iq "^y"; then
             echo "用户 '$NON_ROOT_USER' 已存在。请确保您知道其密码。"
         else
             log_message "正在创建用户 $NON_ROOT_USER..."
-            # adduser 非交互创建用户
             sudo adduser -D "$NON_ROOT_USER"
             echo "$NON_ROOT_USER:$NON_ROOT_PASSWORD" | sudo chpasswd
             check_command "create user $NON_ROOT_USER"
         fi
 
-        log_message "将用户 $NON_ROOT_USER 添加到 wheel 组以授予 sudo 权限..."
-        sudo addgroup "$NON_ROOT_USER" wheel
-        check_command "add $NON_ROOT_USER to wheel group"
-        echo "用户 '$NON_ROOT_USER' 创建并配置 sudo 权限完成。请牢记其密码！"
-        echo ""
-
-        # Alpine默认wheel组sudo权限可能需要安装sudo并配置
         if ! is_installed "sudo"; then
             log_message "sudo 未安装，正在安装..."
-            sudo apk add sudo
+            sudo apk add sudo | tee -a "$LOG_FILE"
             check_command "install sudo"
         fi
 
-        # 确保wheel组的sudo权限配置存在
+        log_message "将用户 $NON_ROOT_USER 添加到 wheel 组以授予 sudo 权限..."
+        sudo addgroup "$NON_ROOT_USER" wheel
+        check_command "add $NON_ROOT_USER to wheel group"
+
         if ! grep -q '^%wheel ALL=(ALL) ALL' /etc/sudoers; then
             echo '%wheel ALL=(ALL) ALL' | sudo tee -a /etc/sudoers
             log_message "已添加 wheel 组 sudo 权限配置。"
         fi
 
-        # 禁用 Root 用户 SSH 登录
         log_message "禁用 Root 用户 SSH 登录..."
         sudo sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
         check_command "PermitRootLogin no"
