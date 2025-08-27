@@ -150,8 +150,8 @@ EOF
 {
     "log-driver": "json-file",
     "log-opts": {
-        "max-size": "5m",
-        "max-file": "5"
+        "max-size": "1m",
+        "max-file": "3"
     },
     "experimental": true,
     "data-root": "/root/docker_data"
