@@ -1,5 +1,5 @@
 #!/bin/bash
-
+#From https://raw.githubusercontent.com/Yuri-NagaSaki/Shell/refs/heads/main/install-docker.sh
 # Function to check if we're in China using IP geolocation
 check_if_in_china() {
     echo "Detecting location using IP geolocation..."
@@ -111,8 +111,8 @@ install_docker_china() {
 {
     "log-driver": "json-file",
     "log-opts": {
-        "max-size": "5m",
-        "max-file": "5"
+        "max-size": "1m",
+        "max-file": "2"
     },
     "experimental": true,
     "data-root": "/root/docker_data",
@@ -134,8 +134,8 @@ install_docker_international() {
 {
     "log-driver": "json-file",
     "log-opts": {
-        "max-size": "5m",
-        "max-file": "5"
+        "max-size": "1m",
+        "max-file": "2"
     },
     "ipv6": true,
     "fixed-cidr-v6": "fd00:dead:beef:c0::/80",
@@ -151,7 +151,7 @@ EOF
     "log-driver": "json-file",
     "log-opts": {
         "max-size": "1m",
-        "max-file": "3"
+        "max-file": "2"
     },
     "experimental": true,
     "data-root": "/root/docker_data"
