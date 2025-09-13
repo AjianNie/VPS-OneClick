@@ -1,16 +1,11 @@
 #!/bin/bash
 
 # ==================================================================
-# 强制使用 BASH 解释器
-# 无论用户使用 "sh script.sh" 还是 "./script.sh" 都能正确执行
+# 脚本将在 BASH 环境下执行。
+# 请确保通过以下方式运行，以使用正确的解释器：
+# 1. chmod +x hy2-alphine.sh
+# 2. ./hy2-alphine.sh
 # ==================================================================
-if [ -z "$BASH_VERSION" ]; then
-    echo "检测到正在使用 sh/ash，正在切换到 bash..."
-    # 将脚本自身和所有参数传递给 bash 重新执行
-    exec bash "$0" "$@"
-fi
-# ==================================================================
-
 
 # hy2一键脚本 for Alpine Linux, 改编自: https://github.com/seagullz4/hysteria2
 
@@ -26,7 +21,7 @@ random_color() {
 }
 
 # Alpine Linux 所需的命令和依赖包
-packages=("bash" "wget" "sed" "openssl" "net-tools" "psmisc" "procps-ng" "iptables" "iproute2" "curl" "libcap")
+packages=("bash" "wget" "sed" "openssl" "net-tools" "psmisc" "procps-ng" "iptables" "iproute2" "curl" "libcap" "ufw")
 
 # 安装缺失的依赖
 install_missing_commands() {
@@ -72,6 +67,16 @@ checkact() {
   fi
 }
 
+# 新增：检查UFW状态
+check_ufw() {
+    if command -v ufw >/dev/null 2>&1 && ufw status | grep -q "Status: active"; then
+        UFW_ACTIVE=true
+        echo "$(random_color '检测到 UFW 防火墙正在运行，将自动配置规则。')"
+    else
+        UFW_ACTIVE=false
+    fi
+}
+
 welcome() {
 echo -e "$(random_color '
 ░██  ░██                                                              
@@ -91,6 +96,7 @@ echo -e "$(random_color '依赖安装完成')"
 set_architecture
 get_installed_version
 checkact
+check_ufw # 检查UFW状态
 welcome
 
 #这些就行提示你输入的😇
@@ -115,46 +121,45 @@ case $choice in
 
    2)
 uninstall_hysteria() {
-  # 停止并移除 Hysteria 服务
+  echo "正在停止并移除 Hysteria 服务..."
   if [ -f "/etc/init.d/hysteria" ]; then
     service hysteria stop >/dev/null 2>&1
     rc-update del hysteria default >/dev/null 2>&1
     rm -f "/etc/init.d/hysteria"
-    echo "Hysteria 服务已移除。"
-  else
-    echo "Hysteria 服务文件不存在。"
   fi
 
-  # 停止并移除端口跳跃服务
+  echo "正在停止并移除端口跳跃服务..."
   if [ -f "/etc/init.d/ipppp" ]; then
     service ipppp stop >/dev/null 2>&1
     rc-update del ipppp default >/dev/null 2>&1
     rm -f "/etc/init.d/ipppp"
-    echo "端口跳跃服务已移除。"
   fi
 
-  # 杀死进程
-  process_name="hysteria-linux-$arch"
-  pkill -f "$process_name"
-  echo "$process_name 进程已被杀死。"
+  echo "正在杀死相关进程..."
+  pkill -f "hysteria-linux-$arch"
 
-  # 删除文件
+  # 新增：清理UFW规则
+  if [ "$UFW_ACTIVE" = true ] && [ -f "/root/hy3/ufw_rules.log" ]; then
+      echo "正在清理 UFW 防火墙规则..."
+      while read -r rule; do
+          ufw delete $rule >/dev/null 2>&1
+      done < "/root/hy3/ufw_rules.log"
+      echo "UFW 规则已清理。"
+  fi
+
+  echo "正在删除文件..."
   if [ -d "/root/hy3" ]; then
     rm -rf /root/hy3
-    echo "Hysteria 配置目录 /root/hy3 已删除。"
   fi
 
-  # 清理防火墙规则
+  echo "正在清理 iptables 规则..."
   iptables -t nat -F PREROUTING
   ip6tables -t nat -F PREROUTING
-  echo "防火墙规则已清理。"
-  echo "卸载完成"
+  
+  echo "$(random_color '卸载完成')"
 }
 
-echo -e "$(random_color '卸载中......')"
 uninstall_hysteria
-sleep 1
-echo -e "$(random_color '卸载完成')"
 exit
      ;;
 
@@ -164,23 +169,10 @@ exit
    3)
 echo "$(random_color '下面是你的nekobox节点信息')" 
 echo "$(random_color '>>>>>>>>>>>>>>>>>>>>')"
-echo "$(random_color '>>>>>>>>>>>>>>>>>>>>')"   
-if [ -f "/root/hy3/neko.txt" ]; then
-    cat /root/hy3/neko.txt
-else
-    echo "nekobox 配置文件不存在。"
-fi
-
-echo "$(random_color '>>>>>>>>>>>>>>>>>>>>')"
+if [ -f "/root/hy3/neko.txt" ]; then cat /root/hy3/neko.txt; else echo "配置文件不存在。"; fi
 echo "$(random_color '>>>>>>>>>>>>>>>>>>>>')"
 echo "$(random_color '下面是你的clashmate配置')"
-
-if [ -f "/root/hy3/clash-mate.yaml" ]; then
-    cat /root/hy3/clash-mate.yaml
-else
-    echo "clash-mate 配置文件不存在。"
-fi
-
+if [ -f "/root/hy3/clash-mate.yaml" ]; then cat /root/hy3/clash-mate.yaml; else echo "配置文件不存在。"; fi
 echo "$(random_color '>>>>>>>>>>>>>>>>>>>>')"
     exit
     ;;
@@ -189,7 +181,6 @@ echo "$(random_color '>>>>>>>>>>>>>>>>>>>>')"
 updatehy2 () {
   echo "正在停止 Hysteria 服务..."
   service hysteria stop
-
   echo "正在下载最新内核..."
   cd /root/hy3
   rm -f hysteria-linux-$arch
@@ -203,7 +194,6 @@ updatehy2 () {
       exit 1
     fi
   fi
-
   echo "正在重启 Hysteria 服务..."
   service hysteria start
   echo "更新完成"
@@ -251,25 +241,19 @@ installhy2 > /dev/null 2>&1
 
 cat <<EOL > config.yaml
 listen: :443
-
 auth:
   type: password
   password: Se7RAuFZ8Lzg
-
 masquerade:
   type: proxy
   proxy:
     url: https://news.ycombinator.com/
     rewriteHost: true 
-
 bandwidth:
   up: 99 gbps
   down: 99 gbps
-
 udpIdleTimeout: 90s
-
 ignoreClientBandwidth: false
-
 quic:
   initStreamReceiveWindow: 8388608 
   maxStreamReceiveWindow: 8388608 
@@ -282,25 +266,26 @@ EOL
 
 while true; do 
     read -p "$(random_color '请输入端口号（留空默认443，输入0随机2000-60000）: ')" port 
-  
-    if [ -z "$port" ]; then 
-      port=443 
-    elif [ "$port" -eq 0 ]; then 
-      port=$((RANDOM % 58001 + 2000)) 
-    elif ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then 
+    if [ -z "$port" ]; then port=443; fi
+    if [ "$port" -eq 0 ]; then port=$((RANDOM % 58001 + 2000)); fi
+    if ! [[ "$port" =~ ^[0-9]+$ ]] || [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then 
       echo "$(random_color '请输入一个 1-65535 之间的数字。')" 
       continue 
     fi 
-  
     if netstat -tuln | grep -q ":$port "; then 
       echo "$(random_color "端口 $port 已被占用，请重新输入。")" 
       continue
     fi
-  
     sed -i "s/:443/:$port/" config.yaml
     echo "$(random_color '端口号已设置为：')" "$port" 
     break
 done
+
+# 新增：UFW放行主端口
+if [ "$UFW_ACTIVE" = true ]; then
+    echo "allow $port/udp" >> /root/hy3/ufw_rules.log
+    ufw allow "$port/udp"
+fi
 
 generate_certificate() {
     read -p "请输入要用于自签名证书的域名（默认为 bing.com）: " user_domain
@@ -324,16 +309,12 @@ if [[ "$cert_choice" == "2" ]]; then
     private_key_path="/etc/ssl/private/$domain_name.key"
     echo -e "证书文件已保存到 $certificate_path"
     echo -e "私钥文件已保存到 $private_key_path"
-    
-    # 使用更兼容的 sed 插入方式
     sed -i "/listen: :$port/a \
 tls:\n  cert: $certificate_path\n  key: $private_key_path" /root/hy3/config.yaml
-    
     touch /root/hy3/ca
     ovokk="insecure=1&"
     choice1="true"
     echo -e "已将证书和密钥信息写入 /root/hy3/config.yaml 文件。"
-    
     get_ipv4_info() {
       ip_address=$(wget -4 -qO- --no-check-certificate http://ip-api.com/json/)
       ispck=$(echo "$ip_address" | sed -n 's/.*"isp"[ ]*:[ ]*"\([^"]*\).*/\1/p')
@@ -343,7 +324,6 @@ tls:\n  cert: $certificate_path\n  key: $private_key_path" /root/hy3/config.yaml
         ipwan=$(echo "$ip_address" | sed -n 's/.*"query"[ ]*:[ ]*"\([^"]*\).*/\1/p')
       fi
     }
-
     get_ipv6_info() {
       ip_address=$(wget -6 -qO- --no-check-certificate https://api.ip.sb/geoip)
       ispck=$(echo "$ip_address" | sed -n 's/.*"isp"[ ]*:[ ]*"\([^"]*\).*/\1/p')
@@ -354,7 +334,6 @@ tls:\n  cert: $certificate_path\n  key: $private_key_path" /root/hy3/config.yaml
         ipwan="[$(echo "$ip_address" | sed -n 's/.*"ip"[ ]*:[ ]*"\([^"]*\).*/\1/p')]"
       fi
     }
-
     while true; do
       read -p "请选择IP模式 (1. IPv4 | 2. IPv6, 回车默认IPv4): " ip_choice
       case $ip_choice in
@@ -368,81 +347,93 @@ fi
 
 if [ ! -f "/root/hy3/ca" ]; then
   read -p "$(random_color '请输入你的域名（必须是解析好的域名哦）: ')" domain
-  while [ -z "$domain" ]; do
-    read -p "$(random_color '域名不能为空，请重新输入: ')" domain
-  done
-
+  while [ -z "$domain" ]; do read -p "$(random_color '域名不能为空，请重新输入: ')" domain; done
   read -p "$(random_color '请输入你的邮箱（默认随机邮箱）: ')" email
   if [ -z "$email" ]; then
     random_part=$(head /dev/urandom | LC_ALL=C tr -dc A-Za-z0-9 | head -c 4)
     email="${random_part}@gmail.com"
   fi
-
-  # 使用更兼容的 sed 插入方式
   sed -i "/listen: :$port/a \
 acme:\n  domains:\n    - $domain\n  email: $email" config.yaml
-  
   echo "$(random_color '域名和邮箱已添加到 config.yaml 文件。')"
   ipta="iptables"
   choice2="false"
 fi
 
 read -p "$(random_color '请输入你的密码（留空将生成随机密码）: ')" password
-if [ -z "$password" ]; then
-  password=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9')
-fi
+if [ -z "$password" ]; then password=$(openssl rand -base64 16 | tr -dc 'a-zA-Z0-9'); fi
 sed -i "s/Se7RAuFZ8Lzg/$password/" config.yaml
 echo "$(random_color '密码已设置为：')" $password
 
 read -p "$(random_color '请输入伪装网址（默认https://news.ycombinator.com/）: ')" masquerade_url
-if [ -z "$masquerade_url" ]; then
-  masquerade_url="https://news.ycombinator.com/"
-fi
+if [ -z "$masquerade_url" ]; then masquerade_url="https://news.ycombinator.com/"; fi
 sed -i "s|https://news.ycombinator.com/|$masquerade_url|" config.yaml
 echo "$(random_color '伪装域名已设置为：')" $masquerade_url
 
-while true; do 
-    read -p "$(random_color '是否要开启端口跳跃功能？(1. 开启 | 回车默认不开启): ')" port_jump 
-    if [[ "$port_jump" != "1" ]]; then 
-      break 
-    fi
-    read -p "$(random_color '请输入起始端口号: ')" start_port 
-    read -p "$(random_color '请输入末尾端口号: ')" end_port 
-
-    if [[ "$start_port" =~ ^[0-9]+$ ]] && [[ "$end_port" =~ ^[0-9]+$ ]] && [ "$start_port" -lt "$end_port" ]; then 
-      "$ipta" -t nat -A PREROUTING -i eth0 -p udp --dport "$start_port":"$end_port" -j DNAT --to-destination :"$port" 
-      echo "$(random_color '端口跳跃功能已开启，将范围重定向到主端口：')" "$port" 
-      break 
-    else 
-      echo "$(random_color '输入无效，起始和末尾端口必须是数字，且起始端口必须小于末尾端口。')" 
-    fi 
-done 
-
+read -p "$(random_color '是否要开启端口跳跃功能？(1. 开启 | 回车默认不开启): ')" port_jump 
 if [[ "$port_jump" == "1" ]]; then
-  echo "#!/sbin/openrc-run" > /etc/init.d/ipppp
-  echo "name=\"Hysteria Port Jumping\"" >> /etc/init.d/ipppp
-  echo "command=\"/sbin/$ipta\"" >> /etc/init.d/ipppp
-  echo "command_args=\"-t nat -A PREROUTING -i eth0 -p udp --dport $start_port:$end_port -j DNAT --to-destination :$port\"" >> /etc/init.d/ipppp
-  echo 'depend() { need net; after firewall; }' >> /etc/init.d/ipppp
-  echo 'start() { ebegin "Applying Hysteria port jumping rules"; $command $command_args; eend $?; }' >> /etc/init.d/ipppp
-  echo 'stop() { ebegin "Flushing NAT table"; /sbin/$ipta -t nat -F PREROUTING; eend 0; }' >> /etc/init.d/ipppp
-  
-  chmod +x /etc/init.d/ipppp
-  rc-update add ipppp default
-  service ipppp start
-  echo "$(random_color '已创建端口跳跃服务并设置开机自启动。')"
+    read -p "$(random_color '请选择跳跃端口模式 (1. 连续范围 | 2. 手动输入, 回车默认1): ')" hop_mode
+    if [[ "$hop_mode" == "2" ]]; then
+        while true; do
+            read -p "$(random_color '请输入要跳跃的端口，用空格隔开: ')" manual_ports
+            valid_ports=true
+            if [ -z "$manual_ports" ]; then echo "$(random_color '输入不能为空。')"; valid_ports=false; else
+                for p in $manual_ports; do
+                    if ! [[ "$p" =~ ^[0-9]+$ ]] || [ "$p" -lt 1 ] || [ "$p" -gt 65535 ]; then
+                        echo "$(random_color "错误: '$p' 不是有效端口。")"; valid_ports=false; break
+                    fi
+                done
+            fi
+            [ "$valid_ports" = true ] && break
+        done
+        comma_separated_ports=$(echo "$manual_ports" | tr ' ' ',')
+        iptables_rule="$ipta -t nat -A PREROUTING -i eth0 -p udp -m multiport --dports $comma_separated_ports -j DNAT --to-destination :$port"
+        hop_ports_for_link="$comma_separated_ports"
+        # 新增：UFW放行手动端口
+        if [ "$UFW_ACTIVE" = true ]; then
+            for p in $manual_ports; do
+                echo "allow $p/udp" >> /root/hy3/ufw_rules.log
+                ufw allow "$p/udp"
+            done
+        fi
+        echo "$(random_color '手动端口跳跃已开启。')"
+    else
+        while true; do
+            read -p "$(random_color '请输入起始端口号: ')" start_port 
+            read -p "$(random_color '请输入末尾端口号: ')" end_port 
+            if [[ "$start_port" =~ ^[0-9]+$ ]] && [[ "$end_port" =~ ^[0-9]+$ ]] && [ "$start_port" -lt "$end_port" ]; then break; else 
+                echo "$(random_color '输入无效，起始需小于末尾。')"
+            fi
+        done
+        iptables_rule="$ipta -t nat -A PREROUTING -i eth0 -p udp --dport $start_port:$end_port -j DNAT --to-destination :$port"
+        hop_ports_for_link="$start_port-$end_port"
+        # 新增：UFW放行连续端口
+        if [ "$UFW_ACTIVE" = true ]; then
+            echo "allow $start_port:$end_port/udp" >> /root/hy3/ufw_rules.log
+            ufw allow "$start_port:$end_port/udp"
+        fi
+        echo "$(random_color '连续端口跳跃已开启。')"
+    fi
+    eval "$iptables_rule"
+    echo "#!/sbin/openrc-run" > /etc/init.d/ipppp
+    echo "name=\"Hysteria Port Jumping\"" >> /etc/init.d/ipppp
+    echo 'depend() { need net; after firewall; }' >> /etc/init.d/ipppp
+    echo "command_args=\"$iptables_rule\"" >> /etc/init.d/ipppp
+    echo 'start() { ebegin "Applying Hysteria port jumping rules"; eval $command_args; eend $?; }' >> /etc/init.d/ipppp
+    echo "stop() { ebegin \"Flushing NAT table\"; /sbin/$ipta -t nat -F PREROUTING; eend 0; }" >> /etc/init.d/ipppp
+    chmod +x /etc/init.d/ipppp
+    rc-update add ipppp default
+    service ipppp start
+    echo "$(random_color '已创建端口跳跃服务并设置开机自启动。')"
 fi
 
 fuser -k -n tcp "$port" >/dev/null 2>&1
 fuser -k -n udp "$port" >/dev/null 2>&1
-
 if setcap cap_net_bind_service=+ep /root/hy3/hysteria-linux-$arch; then
   echo "$(random_color '授予权限成功。')"
 else
-  echo "$(random_color '授予权限失败，退出脚本。')"
-  exit 1
+  echo "$(random_color '授予权限失败，退出脚本。')"; exit 1
 fi
-
 sysctl -w net.core.rmem_max=26214400 >/dev/null 2>&1
 sysctl -w net.core.wmem_max=26214400 >/dev/null 2>&1
 
@@ -473,26 +464,9 @@ command_args="server --config /root/hy3/config.yaml"
 command_background="yes"
 pidfile="/var/run/\${name}.pid"
 directory="/root/hy3"
-
-depend() {
-    need net
-    after firewall
-}
-
-start() {
-    ebegin "Starting \$name"
-    start-stop-daemon --start --quiet --background \
-        --make-pidfile --pidfile \$pidfile \
-        --chdir \$directory \
-        --exec \$command -- \$command_args
-    eend \$?
-}
-
-stop() {
-    ebegin "Stopping \$name"
-    start-stop-daemon --stop --quiet --pidfile \$pidfile
-    eend \$?
-}
+depend() { need net; after firewall; }
+start() { ebegin "Starting \$name"; start-stop-daemon --start --quiet --background --make-pidfile --pidfile \$pidfile --chdir \$directory --exec \$command -- \$command_args; eend \$?; }
+stop() { ebegin "Stopping \$name"; start-stop-daemon --stop --quiet --pidfile \$pidfile; eend \$?; }
 EOF
 
 chmod +x /etc/init.d/hysteria
@@ -506,7 +480,7 @@ echo "$(random_color '这是你的clash配置:')"
 cat /root/hy3/clash-mate.yaml
 
 if [[ "$port_jump" == "1" ]]; then
-  share_link="hysteria2://$password@${domain:-$ipwan}:$port/?${ovokk}mport=$port,$start_port-$end_port&sni=${domain:-$domain_name}#Hysteria2"
+  share_link="hysteria2://$password@${domain:-$ipwan}:$port/?${ovokk}mport=$port,$hop_ports_for_link&sni=${domain:-$domain_name}#Hysteria2"
 else
   share_link="hysteria2://$password@${domain:-$ipwan}:$port/?${ovokk}sni=${domain:-$domain_name}#Hysteria2"
 fi
