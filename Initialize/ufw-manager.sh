@@ -37,12 +37,23 @@ process_ports() {
       continue
     fi
 
-    echo "  正在执行: ufw $action $port/$protocol"
-    ufw "$action" "$port/$protocol"
-    if [ $? -eq 0 ]; then
-      echo "  成功: ufw $action $port/$protocol"
+    local ufw_command=""
+    if [ "$action" == "allow" ]; then
+      ufw_command="ufw allow $port/$protocol"
+    elif [ "$action" == "delete" ]; then
+      # 修正点：删除操作明确指定 'allow' 规则
+      ufw_command="ufw delete allow $port/$protocol"
     else
-      echo "  失败: ufw $action $port/$protocol (可能规则不存在或已存在)"
+      echo "  错误: 未知的操作 '$action'。"
+      continue # 跳过当前端口
+    fi
+
+    echo "  正在执行: $ufw_command"
+    $ufw_command
+    if [ $? -eq 0 ]; then
+      echo "  成功: $ufw_command"
+    else
+      echo "  失败: $ufw_command (可能规则不存在或已存在)"
     fi
   done
 }
@@ -115,3 +126,4 @@ fi
 echo ""
 echo "操作完成。您可以使用 'sudo ufw status' 查看当前UFW状态。"
 echo "如果您想启用UFW，请使用 'sudo ufw enable'。"
+
