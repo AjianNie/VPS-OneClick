@@ -41,20 +41,24 @@ echo ""
 # 1. 更新系统
 echo "--- [1/6] 更新软件包列表并升级系统 ---"
 log_message "正在更新软件包列表..."
-sudo apt update | tee -a "$LOG_FILE"
-check_command "apt update"
+# 修改点：将 apt update 替换为 apt-get update
+sudo apt-get update | tee -a "$LOG_FILE"
+check_command "apt-get update"
 
 log_message "正在升级系统软件包..."
-sudo apt upgrade -y | tee -a "$LOG_FILE"
-check_command "apt upgrade"
+# 修改点：将 apt upgrade 替换为 apt-get upgrade
+sudo apt-get upgrade -y | tee -a "$LOG_FILE"
+check_command "apt-get upgrade"
 
 log_message "正在处理依赖关系升级..."
-sudo apt dist-upgrade -y | tee -a "$LOG_FILE"
-check_command "apt dist-upgrade"
+# 修改点：将 apt dist-upgrade 替换为 apt-get dist-upgrade
+sudo apt-get dist-upgrade -y | tee -a "$LOG_FILE"
+check_command "apt-get dist-upgrade"
 
 log_message "正在移除不再需要的软件包..."
-sudo apt autoremove -y | tee -a "$LOG_FILE"
-check_command "apt autoremove"
+# 修改点：将 apt autoremove 替换为 apt-get autoremove
+sudo apt-get autoremove -y | tee -a "$LOG_FILE"
+check_command "apt-get autoremove"
 
 echo "系统更新完成。"
 echo ""
@@ -125,7 +129,8 @@ if is_installed "ufw"; then
     fi
 else
     log_message "UFW 未安装，正在安装..."
-    sudo apt install ufw -y | tee -a "$LOG_FILE"
+    # 修改点：将 apt install 替换为 apt-get install
+    sudo apt-get install ufw -y | tee -a "$LOG_FILE"
     check_command "ufw install"
 
     log_message "设置 UFW 默认规则：拒绝所有传入，允许所有传出..."
@@ -191,7 +196,8 @@ if [[ "$install_common_tools" =~ ^[Yy]$ ]]; then
             log_message "$tool 已安装，跳过安装。"
         else
             log_message "正在安装 $tool..."
-            sudo apt install "$tool" -y | tee -a "$LOG_FILE"
+            # 修改点：将 apt install 替换为 apt-get install
+            sudo apt-get install "$tool" -y | tee -a "$LOG_FILE"
             check_command "install $tool"
         fi
     done
@@ -200,9 +206,6 @@ else
     echo "跳过安装常用工具。"
 fi
 echo ""
-
-
-
 
 # 4. 配置时区和时间同步
 echo "--- [4/6] 配置时区和时间同步 ---"
@@ -273,7 +276,8 @@ echo "--- [最终步骤] SSH 安全加固：创建非 Root 用户并禁用 Root 
 # 检查 SSH 服务是否已运行
 if ! is_installed "openssh-server"; then
     log_message "OpenSSH Server 未安装，尝试安装..."
-    sudo apt install openssh-server -y | tee -a "$LOG_FILE"
+    # 修改点：将 apt install 替换为 apt-get install
+    sudo apt-get install openssh-server -y | tee -a "$LOG_FILE"
     check_command "install openssh-server"
 fi
 
