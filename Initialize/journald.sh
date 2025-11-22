@@ -1,10 +1,14 @@
 #!/bin/bash
 
-# 定义要替换的目标文件
-JOURNALD_CONF="/etc/systemd/journald.conf"
+# 检查是否以 root 权限运行
+if [ "$(id -u)" -ne 0 ]; then
+   echo "错误：此脚本需要以 root 权限运行。"
+   echo "请尝试使用 'sudo bash' 或切换到 root 用户后执行。"
+   exit 1
+fi
 
-# 定义新的文件内容
-NEW_CONTENT='
+# 使用 cat 和 EOF 直接覆盖写入配置文件
+cat << EOF > /etc/systemd/journald.conf
 #  This file is part of systemd.
 #
 #  systemd is free software; you can redistribute it and/or modify it under the
@@ -17,7 +21,7 @@ NEW_CONTENT='
 # the journald.conf.d/ subdirectory. The latter is generally recommended.
 # Defaults can be restored by simply deleting this file and all drop-ins.
 #
-# Use "systemd-analyze cat-config systemd/journald.conf" to display the full config.
+# Use 'systemd-analyze cat-config systemd/journald.conf' to display the full config.
 #
 # See journald.conf(5) for details.
 
@@ -52,39 +56,12 @@ MaxRetentionSec=7day
 #LineMax=48K
 #ReadKMsg=yes
 #Audit=no
-'
+EOF
 
-# 检查脚本是否以root用户权限运行
-if [ "$(id -u)" -ne 0 ]; then
-    echo "此脚本需要root权限才能运行。请使用 sudo 执行。"
-    exit 1
-fi
+echo "✅ 配置文件 /etc/systemd/journald.conf 已成功更新。"
 
-echo "正在备份原始的 $JOURNALD_CONF 文件..."
-cp "$JOURNALD_CONF" "${JOURNALD_CONF}.bak_$(date +%Y%m%d%H%M%S)"
+# 重启 journald 服务以应用更改
+echo "🔄 正在重启 systemd-journald 服务..."
+systemctl restart systemd-journald
 
-if [ $? -eq 0 ]; then
-    echo "备份成功。"
-else
-    echo "备份失败，请检查权限或磁盘空间。"
-    exit 1
-fi
-
-echo "正在替换 $JOURNALD_CONF 的内容..."
-echo "$NEW_CONTENT" | tee "$JOURNALD_CONF" > /dev/null
-
-if [ $? -eq 0 ]; then
-    echo "文件内容替换成功。"
-    echo "正在重新加载 systemd-journald 配置..."
-    systemctl restart systemd-journald
-    if [ $? -eq 0 ]; then
-        echo "systemd-journald 服务已成功重启。"
-    else
-        echo "systemd-journald 服务重启失败，请手动检查。"
-    fi
-else
-    echo "文件内容替换失败，请检查权限或磁盘空间。"
-    exit 1
-fi
-
-echo "脚本执行完毕。"
+echo "🎉 操作完成！journald 配置已生效。"
