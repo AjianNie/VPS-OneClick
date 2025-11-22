@@ -17,7 +17,7 @@ NEW_CONTENT='
 # the journald.conf.d/ subdirectory. The latter is generally recommended.
 # Defaults can be restored by simply deleting this file and all drop-ins.
 #
-# Use 'systemd-analyze cat-config systemd/journald.conf' to display the full config.
+# Use "systemd-analyze cat-config systemd/journald.conf" to display the full config.
 #
 # See journald.conf(5) for details.
 
