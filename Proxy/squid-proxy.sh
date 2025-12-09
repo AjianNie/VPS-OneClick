@@ -108,7 +108,7 @@ while true; do
     fi
 done
 
-# 获取 IP 白名单（用户只填“额外 IP”，127.0.0.1 脚本自动加）
+# 获取 IP 白名单（用户只填"额外 IP"，127.0.0.1 脚本自动加）
 read -p "请输入允许的客户端 IP 白名单（多个 IP 用空格隔开，如：192.168.1.1 10.0.0.1）: " ip_whitelist
 if [ -z "$ip_whitelist" ]; then
     print_info "未设置额外 IP 白名单，将只允许 127.0.0.1"
@@ -333,7 +333,49 @@ echo -e "     编辑命令: ${BLUE}sudo nano /etc/squid/squid.conf${NC}\n"
 
 echo -e "${YELLOW}【测试有效性】${NC}"
 echo -e "  在${BLUE}另一台客户端机器${NC}上执行以下命令进行测试：\n"
+echo -e "  HTTP 测试:"
 echo -e "  ${BLUE}curl -v -x http://$proxy_username:$proxy_password@$server_ip:$squid_port http://www.example.com${NC}\n"
 
-echo -e "  或使用 HTTPS 测试：\n"
-echo -e "  ${BLUE}curl -v -x http
+echo -e "  HTTPS 测试:"
+echo -e "  ${BLUE}curl -v -x http://$proxy_username:$proxy_password@$server_ip:$squid_port https://www.example.com${NC}\n"
+
+echo -e "  浏览器测试:"
+echo -e "  1. 打开浏览器 -> 设置 -> 网络设置 -> 代理"
+echo -e "  2. 选择手动配置"
+echo -e "  3. HTTP 代理: ${BLUE}$server_ip${NC}，端口: ${BLUE}$squid_port${NC}"
+echo -e "  4. 访问任何网站，输入用户名和密码进行认证\n"
+
+echo -e "${YELLOW}【查看日志】${NC}"
+echo -e "  实时查看访问日志: ${BLUE}sudo tail -f /var/log/squid/access.log${NC}"
+echo -e "  查看缓存日志:     ${BLUE}sudo tail -f /var/log/squid/cache.log${NC}\n"
+
+echo -e "${YELLOW}【服务管理】${NC}"
+echo -e "  查看服务状态:     ${BLUE}sudo systemctl status squid${NC}"
+echo -e "  重启服务:         ${BLUE}sudo systemctl restart squid${NC}"
+echo -e "  停止服务:         ${BLUE}sudo systemctl stop squid${NC}"
+echo -e "  启动服务:         ${BLUE}sudo systemctl start squid${NC}\n"
+
+echo -e "${YELLOW}【修改白名单】${NC}"
+echo -e "  编辑 /etc/squid/squid.conf 文件，找到 'acl allowed_ips' 行"
+echo -e "  修改后执行: ${BLUE}sudo systemctl reload squid${NC}\n"
+
+echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
+
+# ============================================================================
+# 验证服务状态
+# ============================================================================
+print_title "最终验证"
+
+if systemctl is-active --quiet squid; then
+    print_success "Squid 服务运行正常"
+else
+    print_error "Squid 服务可能未正确启动，请检查日志"
+fi
+
+# ============================================================================
+# 脚本完成
+# ============================================================================
+print_title "脚本执行完成"
+print_info "如有任何问题，请查看 /var/log/squid/ 下的日志文件"
+
+exit 0
