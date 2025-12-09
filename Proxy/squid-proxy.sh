@@ -118,9 +118,9 @@ else
     allowed_ips="127.0.0.1 $ip_whitelist"
 fi
 
-# 获取监听端口（默认 3128）
-read -p "请输入 Squid 监听端口（默认 3128）: " squid_port
-squid_port=${squid_port:-3128}
+# 获取监听端口（默认 12544）
+read -p "请输入 Squid 监听端口（默认 12544）: " squid_port
+squid_port=${squid_port:-12544}
 
 print_success "用户信息已收集"
 
