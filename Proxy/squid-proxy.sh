@@ -200,14 +200,10 @@ acl CONNECT method CONNECT
 http_access deny !Safe_ports
 http_access deny CONNECT !SSL_ports
 
-# 允许本地网络访问
-http_access allow localnet
-
-# 允许白名单 IP 的访问
-http_access allow allowed_ips
-
-# 允许已认证用户且来自白名单 IP 的请求
-http_access allow authenticated allowed_ips
+# 满足以下任意一条就允许（OR 逻辑）
+http_access allow localnet          # 本地访问
+http_access allow allowed_ips       # 白名单 IP（无论是否认证）
+http_access allow authenticated     # 任意认证用户（无论来源 IP）
 
 # 拒绝所有其他访问
 http_access deny all
