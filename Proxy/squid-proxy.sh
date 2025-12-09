@@ -233,9 +233,11 @@ print_title "创建认证用户"
 
 print_info "创建用户: $proxy_username"
 
-# 使用 echo 和管道创建密码，避免交互
-echo "$proxy_password" | sudo htpasswd -c /etc/squid/passwd "$proxy_username" -i > /dev/null 2>&1 || \
-    echo "$proxy_password" | sudo htpasswd -c /etc/squid/passwd "$proxy_username" > /dev/null 2>&1
+# 使用 openssl passwd 生成加密密码，然后直接写入 htpasswd 格式的密文
+encrypted_password=$(echo -n "$proxy_password" | openssl passwd -apr1 -stdin)
+
+# 直接写入密码文件，格式为 username:encrypted_password
+echo "$proxy_username:$encrypted_password" | sudo tee /etc/squid/passwd > /dev/null 2>&1
 
 print_success "用户 $proxy_username 已创建"
 
