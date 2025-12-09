@@ -108,14 +108,17 @@ while true; do
     fi
 done
 
-# 获取 IP 白名单
+# 获取 IP 白名单（用户只填“额外 IP”，127.0.0.1 脚本自动加）
 read -p "请输入允许的客户端 IP 白名单（多个 IP 用空格隔开，如：192.168.1.1 10.0.0.1）: " ip_whitelist
 if [ -z "$ip_whitelist" ]; then
-    print_info "未设置 IP 白名单，将只允许 127.0.0.1"
-    ip_whitelist="127.0.0.1"ip
+    print_info "未设置额外 IP 白名单，将只允许 127.0.0.1"
+    allowed_ips="127.0.0.1"
+else
+    # 最终用于 acl 的 IP 列表：127.0.0.1 + 用户输入
+    allowed_ips="127.0.0.1 $ip_whitelist"
 fi
 
-# 获取监听端口（默认 3128，但文档中配置使用 12544）
+# 获取监听端口（默认 3128）
 read -p "请输入 Squid 监听端口（默认 3128）: " squid_port
 squid_port=${squid_port:-3128}
 
@@ -152,11 +155,8 @@ print_title "生成 Squid 配置文件"
 
 print_info "生成新的配置文件..."
 
-# 构建 IP 白名单配置行
-ip_whitelist_config=""
-for ip in $ip_whitelist; do
-    ip_whitelist_config="${ip_whitelist_config}acl allowed_ips src $ip\n"
-done
+# 构建 IP 白名单配置行（单行多 IP）
+ip_whitelist_line="acl allowed_ips src $allowed_ips"
 
 # 使用 tee 命令写入配置文件
 sudo tee /etc/squid/squid.conf > /dev/null <<EOF
@@ -187,7 +187,7 @@ acl Safe_ports port 777         # multiling http
 acl localnet src 127.0.0.1
 
 # 4. 定义允许访问的客户端 IP 白名单
-$ip_whitelist_config
+$ip_whitelist_line
 
 # 5. 定义已认证用户的 ACL
 acl authenticated proxy_auth REQUIRED
@@ -325,7 +325,7 @@ echo -e "  IP 地址:          ${BLUE}$server_ip${NC}"
 echo -e "  监听端口:         ${BLUE}$squid_port${NC}"
 echo -e "  用户名:           ${BLUE}$proxy_username${NC}"
 echo -e "  密码:             ${BLUE}$proxy_password${NC}"
-echo -e "  IP 白名单:        ${BLUE}$ip_whitelist${NC}\n"
+echo -e "  IP 白名单:        ${BLUE}$allowed_ips${NC}\n"
 
 echo -e "${YELLOW}【重要：请检查以下内容】${NC}"
 echo -e "  1. 请检查 ${BLUE}/etc/squid/squid.conf${NC} 文件中的 IP 白名单设置是否正确"
@@ -336,45 +336,4 @@ echo -e "  在${BLUE}另一台客户端机器${NC}上执行以下命令进行测
 echo -e "  ${BLUE}curl -v -x http://$proxy_username:$proxy_password@$server_ip:$squid_port http://www.example.com${NC}\n"
 
 echo -e "  或使用 HTTPS 测试：\n"
-echo -e "  ${BLUE}curl -v -x http://$proxy_username:$proxy_password@$server_ip:$squid_port https://www.example.com${NC}\n"
-
-echo -e "  浏览器测试："
-echo -e "  1. 打开浏览器 -> 设置 -> 网络设置 -> 代理"
-echo -e "  2. 选择手动配置"
-echo -e "  3. HTTP 代理: ${BLUE}$server_ip${NC}，端口: ${BLUE}$squid_port${NC}"
-echo -e "  4. 访问任何网站，输入用户名和密码进行认证\n"
-
-echo -e "${YELLOW}【查看日志】${NC}"
-echo -e "  实时查看访问日志: ${BLUE}sudo tail -f /var/log/squid/access.log${NC}"
-echo -e "  查看缓存日志:     ${BLUE}sudo tail -f /var/log/squid/cache.log${NC}\n"
-
-echo -e "${YELLOW}【服务管理】${NC}"
-echo -e "  查看服务状态:     ${BLUE}sudo systemctl status squid${NC}"
-echo -e "  重启服务:         ${BLUE}sudo systemctl restart squid${NC}"
-echo -e "  停止服务:         ${BLUE}sudo systemctl stop squid${NC}"
-echo -e "  启动服务:         ${BLUE}sudo systemctl start squid${NC}\n"
-
-echo -e "${YELLOW}【修改白名单】${NC}"
-echo -e "  编辑 /etc/squid/squid.conf 文件，找到 'acl allowed_ips' 行"
-echo -e "  修改后执行: ${BLUE}sudo systemctl reload squid${NC}\n"
-
-echo -e "${GREEN}════════════════════════════════════════════════════════════${NC}\n"
-
-# ============================================================================
-# 验证服务状态
-# ============================================================================
-print_title "最终验证"
-
-if systemctl is-active --quiet squid; then
-    print_success "Squid 服务运行正常"
-else
-    print_error "Squid 服务可能未正确启动，请检查日志"
-fi
-
-# ============================================================================
-# 脚本完成
-# ============================================================================
-print_title "脚本执行完成"
-print_info "如有任何问题，请查看 /var/log/squid/ 下的日志文件"
-
-exit 0
+echo -e "  ${BLUE}curl -v -x http
