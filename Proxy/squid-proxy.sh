@@ -112,7 +112,7 @@ done
 read -p "请输入允许的客户端 IP 白名单（多个 IP 用空格隔开，如：192.168.1.1 10.0.0.1）: " ip_whitelist
 if [ -z "$ip_whitelist" ]; then
     print_info "未设置 IP 白名单，将只允许 127.0.0.1"
-    ip_whitelist="127.0.0.1"
+    ip_whitelist="127.0.0.1"ip
 fi
 
 # 获取监听端口（默认 3128，但文档中配置使用 12544）
