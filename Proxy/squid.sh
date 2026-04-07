@@ -111,6 +111,22 @@ join_ips() {
   printf '%s' "${ips[*]}"
 }
 
+prompt_tty() {
+  local prompt="$1"
+  local __resultvar="$2"
+  local reply=""
+
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    printf '%s' "$prompt" >/dev/tty
+    if IFS= read -r reply </dev/tty; then
+      printf -v "$__resultvar" '%s' "$reply"
+      return 0
+    fi
+  fi
+
+  return 1
+}
+
 is_sourced() {
   [[ "${BASH_SOURCE[0]}" != "$0" ]]
 }
@@ -169,26 +185,29 @@ main() {
   fi
 
   if [[ -z "${env_user}" && -z "${env_password}" ]]; then
-    log "0.3 选择: 1) 停止并导入变量  2) 继续并自动生成"
     local choice=""
-    read -r -p "0.3 请输入 [1/2] (默认 1): " choice
-    case "${choice:-1}" in
-      1)
-        log "0.3.1 导入: export squid_user=\"proxyuser\"; export squid_password=\"your_password\""
-        log "0.3.2 完成后重跑: ./scripts/squid.sh"
-        if is_sourced; then
-          return 0
-        fi
-        exit 0
-        ;;
-      2)
-        auto_generate_creds=1
-        log "0.3.2 继续: 将自动生成用户名和密码"
-        ;;
-      *)
-        die "无效选择，仅支持 1 或 2"
-        ;;
-    esac
+    if prompt_tty "0.3 选择: 1) 停止并导入变量  2) 继续并自动生成\n0.3 请输入 [1/2] (默认 2): " choice; then
+      case "${choice:-2}" in
+        1)
+          log "0.3.1 导入: export squid_user=\"proxyuser\"; export squid_password=\"your_password\""
+          log "0.3.2 完成后重跑: ./scripts/squid.sh"
+          if is_sourced; then
+            return 0
+          fi
+          exit 0
+          ;;
+        2|"")
+          auto_generate_creds=1
+          log "0.3.2 继续: 将自动生成用户名和密码"
+          ;;
+        *)
+          die "无效选择，仅支持 1 或 2"
+          ;;
+      esac
+    else
+      auto_generate_creds=1
+      log "0.3.2 继续: 未检测到 TTY，自动生成用户名和密码"
+    fi
   fi
 
   log "步骤 1: IP 白名单"
