@@ -30,6 +30,18 @@ have_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
+pkg_mgr() {
+  if have_cmd apt-get; then
+    printf '%s' apt-get
+    return 0
+  fi
+  if have_cmd apk; then
+    printf '%s' apk
+    return 0
+  fi
+  return 1
+}
+
 as_root() {
   if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
     "$@"
@@ -132,18 +144,42 @@ is_sourced() {
 }
 
 ensure_packages() {
+  local mgr
+  mgr="$(pkg_mgr)" || die "未找到可用的包管理器（apt-get 或 apk）"
   log "检查并安装依赖：squid / apache2-utils"
-  as_root apt-get update
-  as_root apt-get install -y squid apache2-utils
+  case "$mgr" in
+    apt-get)
+      as_root apt-get update
+      as_root apt-get install -y squid apache2-utils
+      ;;
+    apk)
+      as_root apk add --no-cache squid apache2-utils
+      ;;
+  esac
 }
 
 ensure_ufw() {
   if have_cmd ufw; then
     return 0
   fi
+  local mgr
+  mgr="$(pkg_mgr)" || return 1
   log "检测到 ufw 未安装，正在安装"
-  as_root apt-get update
-  as_root apt-get install -y ufw
+  case "$mgr" in
+    apt-get)
+      if ! as_root apt-get update || ! as_root apt-get install -y ufw; then
+        warn "ufw 安装失败，已跳过自动放行"
+        return 1
+      fi
+      ;;
+    apk)
+      if ! as_root apk add --no-cache ufw; then
+        warn "当前环境无法安装 ufw，已跳过自动放行"
+        return 1
+      fi
+      ;;
+  esac
+  have_cmd ufw
 }
 
 main() {
@@ -283,8 +319,9 @@ main() {
   log "步骤 5: UFW"
   local ufw_enabled=0
   if prompt_yes_no "UFW自动放行"; then
-    ensure_ufw
-    ufw_enabled=1
+    if ensure_ufw; then
+      ufw_enabled=1
+    fi
   fi
 
   log "步骤 6: 安装与配置 Squid"
