@@ -127,6 +127,53 @@ join_ips() {
   printf '%s' "${ips[*]}"
 }
 
+normalize_whitelist() {
+  python3 - "$@" <<'PY'
+import ipaddress
+import socket
+import sys
+
+items = sys.argv[1:]
+seen = set()
+output = []
+
+for raw in items:
+    token = raw.strip()
+    if not token:
+        continue
+    try:
+        network = ipaddress.ip_network(token, strict=False)
+    except ValueError:
+        try:
+            infos = socket.getaddrinfo(token, None, type=socket.SOCK_STREAM)
+        except socket.gaierror as exc:
+            print(f"无法解析白名单项 {token!r}: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        resolved = []
+        for info in infos:
+          addr = info[4][0]
+          if addr not in seen and addr not in resolved:
+            resolved.append(addr)
+
+        if not resolved:
+            print(f"无法解析白名单项 {token!r}: 未返回可用地址", file=sys.stderr)
+            sys.exit(1)
+
+        for addr in resolved:
+            seen.add(addr)
+            output.append(addr)
+        continue
+
+    normalized = str(network)
+    if normalized not in seen:
+        seen.add(normalized)
+        output.append(normalized)
+
+print(" ".join(output))
+PY
+}
+
 prompt_tty() {
   local prompt="$1"
   local __resultvar="$2"
@@ -337,6 +384,8 @@ main() {
   if [[ "${#whitelist[@]}" -eq 0 ]]; then
     whitelist=("$DEFAULT_WHITELIST")
   fi
+  local whitelist_line
+  whitelist_line="$(normalize_whitelist "${whitelist[@]}")" || die "白名单包含无法解析的主机名或无效地址"
 
   log "步骤 2: 监听端口"
   local port=""
@@ -417,9 +466,6 @@ main() {
     as_root cp -a "$SQUID_CONF" "$backup"
     log "已备份原配置到: ${backup}"
   fi
-
-  local whitelist_line
-  whitelist_line="$(join_ips "${whitelist[@]}")"
 
   log "写入配置"
   as_root tee "$SQUID_CONF" >/dev/null <<EOF
