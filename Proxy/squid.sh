@@ -42,6 +42,10 @@ pkg_mgr() {
   return 1
 }
 
+is_alpine() {
+  [[ -f /etc/alpine-release ]] || [[ "$(pkg_mgr 2>/dev/null || true)" == "apk" ]]
+}
+
 as_root() {
   if [[ "${EUID:-$(id -u)}" -eq 0 ]]; then
     "$@"
@@ -143,6 +147,39 @@ is_sourced() {
   [[ "${BASH_SOURCE[0]}" != "$0" ]]
 }
 
+account_exists() {
+  local name="$1"
+  [[ -r /etc/passwd ]] && grep -qE "^${name}:" /etc/passwd
+}
+
+group_exists() {
+  local name="$1"
+  [[ -r /etc/group ]] && grep -qE "^${name}:" /etc/group
+}
+
+pick_squid_owner() {
+  if is_alpine; then
+    if account_exists squid && group_exists squid; then
+      printf '%s' "squid:squid"
+      return 0
+    fi
+    if account_exists proxy && group_exists proxy; then
+      printf '%s' "proxy:proxy"
+      return 0
+    fi
+  else
+    if account_exists proxy && group_exists proxy; then
+      printf '%s' "proxy:proxy"
+      return 0
+    fi
+    if account_exists squid && group_exists squid; then
+      printf '%s' "squid:squid"
+      return 0
+    fi
+  fi
+  return 1
+}
+
 ensure_packages() {
   local mgr
   mgr="$(pkg_mgr)" || die "未找到可用的包管理器（apt-get 或 apk）"
@@ -153,9 +190,31 @@ ensure_packages() {
       as_root apt-get install -y squid apache2-utils
       ;;
     apk)
-      as_root apk add --no-cache squid apache2-utils
+      as_root apk add --no-cache squid apache2-utils openrc squid-openrc
       ;;
   esac
+}
+
+ensure_python3() {
+  if have_cmd python3; then
+    return 0
+  fi
+
+  local mgr
+  mgr="$(pkg_mgr)" || die "缺少 python3，且未找到可用的包管理器（apt-get 或 apk）"
+
+  log "检查并安装依赖：python3"
+  case "$mgr" in
+    apt-get)
+      as_root apt-get update
+      as_root apt-get install -y python3
+      ;;
+    apk)
+      as_root apk add --no-cache python3
+      ;;
+  esac
+
+  have_cmd python3 || die "python3 安装完成后仍不可用"
 }
 
 ensure_ufw() {
@@ -182,13 +241,35 @@ ensure_ufw() {
   have_cmd ufw
 }
 
-main() {
-  if ! have_cmd python3; then
-    die "缺少 python3，脚本需要它来对代理账号和密码做 URL 编码"
+start_squid_service() {
+  if is_alpine; then
+    if ! have_cmd rc-service || ! have_cmd rc-update; then
+      if have_cmd apk; then
+        log "Alpine: 检测到 OpenRC 工具缺失，正在安装 openrc"
+        as_root apk add --no-cache openrc
+      fi
+    fi
+
+    have_cmd rc-service || die "Alpine 环境缺少 rc-service，无法启动 squid"
+    have_cmd rc-update || die "Alpine 环境缺少 rc-update，无法设置 squid 开机启动"
+
+    as_root rc-update add squid default
+    if ! as_root rc-service squid restart; then
+      as_root rc-service squid start
+    fi
+    return 0
   fi
+
+  as_root systemctl enable squid
+  as_root systemctl restart squid
+}
+
+main() {
   if ! have_cmd sudo && [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
     die "需要 root 权限或可用的 sudo"
   fi
+
+  ensure_python3
 
   log "步骤 0: 读取环境变量"
   local env_user=""
@@ -385,15 +466,19 @@ EOF
 
   log "生成账号文件"
   as_root htpasswd -bc "$SQUID_PASSWD" "$username" "$password"
-  as_root chown proxy:proxy "$SQUID_PASSWD"
+  local squid_owner
+  if squid_owner="$(pick_squid_owner)"; then
+    as_root chown "$squid_owner" "$SQUID_PASSWD"
+  else
+    warn "未识别到 proxy 或 squid 账号，已保留默认属主"
+  fi
   as_root chmod 640 "$SQUID_PASSWD"
 
   log "检查配置语法"
   as_root squid -k parse
 
   log "启动服务"
-  as_root systemctl enable squid
-  as_root systemctl restart squid
+  start_squid_service
 
   if (( ufw_enabled == 1 )); then
     log "放行 UFW 端口"
