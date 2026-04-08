@@ -380,7 +380,10 @@ main() {
   whitelist_input="${whitelist_input:-$DEFAULT_WHITELIST}"
   whitelist_input="${whitelist_input//,/ }"
   local -a whitelist=()
+  local old_ifs="$IFS"
+  IFS=$' \t\n'
   read -r -a whitelist <<< "${whitelist_input}"
+  IFS="$old_ifs"
   if [[ "${#whitelist[@]}" -eq 0 ]]; then
     whitelist=("$DEFAULT_WHITELIST")
   fi
