@@ -12,7 +12,7 @@ echo -e "${GREEN}=== Alpine iptables 端口管理脚本 ===${NC}"
 
 # 检查并安装必要的工具
 check_dependencies() {
-    echo -e "${YELLOW}检查并安装 iptables 和 iptables-persistent...${NC}"
+    echo -e "${YELLOW}检查并安装 iptables...${NC}"
 
     # 检查 iptables
     if ! command -v iptables >/dev/null; then
@@ -26,19 +26,14 @@ check_dependencies() {
         apk add openrc || { echo -e "${RED}错误：安装 openrc 失败。请检查网络或权限。${NC}"; exit 1; }
     fi
 
-    # 检查 iptables-persistent 是否已安装
-    if ! apk info -e iptables-persistent >/dev/null 2>&1; then
-        echo -e "${YELLOW}iptables-persistent 未安装，正在安装...${NC}"
-        apk add iptables-persistent || { echo -e "${RED}错误：安装 iptables-persistent 失败。请检查网络或权限。${NC}"; exit 1; }
-    fi
-
     # 检查 iptables 服务是否已启用（通过检查 /etc/runlevels/default/iptables 符号链接）
+    # 如果 iptables 服务未添加到默认运行级别，则添加它
     if [ ! -e /etc/runlevels/default/iptables ]; then
         echo -e "${YELLOW}iptables 服务未启用，正在启用...${NC}"
         rc-update add iptables default || { echo -e "${RED}错误：启用 iptables 服务失败。${NC}"; exit 1; }
     fi
 
-    echo -e "${GREEN}iptables 和 iptables-persistent 已就绪。${NC}"
+    echo -e "${GREEN}iptables 已就绪。${NC}"
 }
 
 # 显示当前 iptables 规则
@@ -102,12 +97,15 @@ delete_ports() {
 # 保存 iptables 规则
 save_iptables_rules() {
     echo -e "${YELLOW}\n保存 iptables 规则...${NC}"
-    # 确保 rc-service 存在
+    # 在 Alpine 中，iptables 规则通常保存到 /etc/iptables/rules.v4 和 /etc/iptables/rules.v6
+    # 并且由 OpenRC 的 iptables 服务在启动时加载
+    # rc-service iptables save 命令会执行此操作
     if command -v rc-service >/dev/null; then
         rc-service iptables save || { echo -e "${RED}错误：保存 iptables 规则失败！请手动检查。${NC}"; exit 1; }
-        echo -e "${GREEN}iptables 规则已保存，重启后将生效。${NC}"
+        echo -e "${GREEN}iptables 规则已保存到 /etc/iptables/rules.v4，重启后将自动加载。${NC}"
     else
         echo -e "${RED}rc-service 命令未找到，无法保存规则。请手动保存。${NC}"
+        echo -e "${RED}您可以尝试手动执行：iptables-save > /etc/iptables/rules.v4${NC}"
     fi
 }
 
