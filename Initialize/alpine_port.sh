@@ -12,7 +12,7 @@ echo -e "${GREEN}=== Alpine iptables 端口管理脚本 ===${NC}"
 
 # 检查并安装必要的工具
 check_dependencies() {
-    echo -e "${YELLOW}检查并安装 iptables...${NC}"
+    echo -e "${YELLOW}检查并安装 iptables...${NC}" # <--- 注意这里，已经没有 iptables-persistent 了
 
     # 检查 iptables
     if ! command -v iptables >/dev/null; then
