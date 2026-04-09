@@ -12,7 +12,7 @@ echo -e "${GREEN}=== Alpine iptables 端口管理脚本 ===${NC}"
 
 # 检查并安装必要的工具
 check_dependencies() {
-    echo -e "${YELLOW}检查并安装 iptables...${NC}" # <--- 注意这里，已经没有 iptables-persistent 了
+    echo -e "${YELLOW}检查并安装 iptables...${NC}"
 
     # 检查 iptables
     if ! command -v iptables >/dev/null; then
@@ -135,7 +135,10 @@ done
 # 4. 询问端口号
 PORTS_TO_OPERATE=""
 while [ -z "$PORTS_TO_OPERATE" ]; do
-    read -p "${YELLOW}请输入要操作的端口号（多个端口用空格隔开，例如：80 443 2222）：${NC} " ports_input
+    # 修改后的行
+    echo -en "${YELLOW}请输入要操作的端口号（多个端口用空格隔开，例如：80 443 2222）：${NC} "
+    read ports_input
+    # 原始的验证逻辑不变
     if [ -n "$ports_input" ]; then
         # 简单验证输入是否为数字和空格
         if echo "$ports_input" | grep -Eq '^[0-9 ]+$'; then
