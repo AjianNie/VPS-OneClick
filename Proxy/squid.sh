@@ -74,14 +74,45 @@ print("".join(random.SystemRandom().choice(alphabet) for _ in range(length)))
 PY
 }
 
+# 修改后的 detect_host_ip 函数
 detect_host_ip() {
-  local ip
-  ip="$(hostname -I 2>/dev/null | awk '{print $1}')"
-  if [[ -z "${ip:-}" ]]; then
-    ip="$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") {print $(i + 1); exit}}')"
+  local public_ip=""
+
+  # 尝试使用外部服务获取公网IP
+  if have_cmd curl; then
+    # 尝试多个服务，带超时，静默模式
+    public_ip="$(curl -s -m 5 ifconfig.me || curl -s -m 5 ipinfo.io/ip || curl -s -m 5 ident.me || true)"
+    # 简单验证是否是IPv4地址
+    if [[ -n "$public_ip" && "$public_ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+      printf '%s' "$public_ip"
+      return 0
+    fi
   fi
-  printf '%s' "${ip:-127.0.0.1}"
+
+  # 如果curl失败，尝试使用dig
+  if have_cmd dig; then
+    public_ip="$(dig +short myip.opendns.com @resolver1.opendns.com 2>/dev/null || true)"
+    if [[ -n "$public_ip" && "$public_ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+      printf '%s' "$public_ip"
+      return 0
+    fi
+  fi
+
+  # 如果所有外部方法都失败，回退到本地IP，并发出警告
+  local local_ip
+  local_ip="$(ip route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") {print $(i + 1); exit}}')"
+  if [[ -n "${local_ip:-}" ]]; then
+    warn "未能自动检测到公网IP地址。将使用服务器的本地IP: ${local_ip}。如果您的服务器在NAT后面，这可能不是正确的外部访问IP。"
+    printf '%s' "$local_ip"
+    return 0
+  fi
+
+  # 最终回退到 localhost
+  warn "未能检测到任何可用的IP地址，将使用 127.0.0.1。这可能导致代理无法从外部访问。"
+  printf '%s' "127.0.0.1"
+  return 0
 }
+
 
 pick_basic_auth_bin() {
   local candidate
@@ -230,14 +261,14 @@ pick_squid_owner() {
 ensure_packages() {
   local mgr
   mgr="$(pkg_mgr)" || die "未找到可用的包管理器（apt-get 或 apk）"
-  log "检查并安装依赖：squid / apache2-utils"
+  log "检查并安装依赖：squid / apache2-utils / curl / dnsutils"
   case "$mgr" in
     apt-get)
       as_root apt-get update
-      as_root apt-get install -y squid apache2-utils
+      as_root apt-get install -y squid apache2-utils curl dnsutils
       ;;
     apk)
-      as_root apk add --no-cache squid apache2-utils openrc squid-openrc
+      as_root apk add --no-cache squid apache2-utils curl bind-tools openrc squid-openrc
       ;;
   esac
 }
@@ -538,7 +569,7 @@ EOF
   fi
 
   local server_ip proxy_url test_url enc_user enc_pass
-  server_ip="$(detect_host_ip)"
+  server_ip="$(detect_host_ip)" # 这里会调用新的函数
   enc_user="$(urlencode "$username")"
   enc_pass="$(urlencode "$password")"
   proxy_url="http://${enc_user}:${enc_pass}@${server_ip}:${port}"
