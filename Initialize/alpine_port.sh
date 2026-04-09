@@ -20,20 +20,36 @@ check_dependencies() {
         apk add iptables || { echo -e "${RED}错误：安装 iptables 失败。请检查网络或权限。${NC}"; exit 1; }
     fi
 
-    # 检查 iptables-persistent 服务
-    # rc-service 是 OpenRC 的命令，用于管理服务
-    if ! command -v rc-service >/dev/null || ! rc-service iptables status >/dev/null 2>&1; then
-        echo -e "${YELLOW}iptables-persistent 服务未安装或未启用，正在安装/启用...${NC}"
+    # 检查 openrc (包含 rc-service)
+    if ! command -v rc-service >/dev/null; then
+        echo -e "${YELLOW}openrc (包含 rc-service) 未安装，正在安装...${NC}"
+        apk add openrc || { echo -e "${RED}错误：安装 openrc 失败。请检查网络或权限。${NC}"; exit 1; }
+    fi
+
+    # 检查 iptables-persistent 是否已安装
+    if ! apk info -e iptables-persistent >/dev/null 2>&1; then
+        echo -e "${YELLOW}iptables-persistent 未安装，正在安装...${NC}"
         apk add iptables-persistent || { echo -e "${RED}错误：安装 iptables-persistent 失败。请检查网络或权限。${NC}"; exit 1; }
+    fi
+
+    # 检查 iptables 服务是否已启用（通过检查 /etc/runlevels/default/iptables 符号链接）
+    if [ ! -e /etc/runlevels/default/iptables ]; then
+        echo -e "${YELLOW}iptables 服务未启用，正在启用...${NC}"
         rc-update add iptables default || { echo -e "${RED}错误：启用 iptables 服务失败。${NC}"; exit 1; }
     fi
+
     echo -e "${GREEN}iptables 和 iptables-persistent 已就绪。${NC}"
 }
 
 # 显示当前 iptables 规则
 display_current_rules() {
     echo -e "\n${YELLOW}--- 当前 iptables INPUT 链规则 ---${NC}"
-    iptables -L INPUT -n -v
+    # 确保 iptables 命令存在
+    if command -v iptables >/dev/null; then
+        iptables -L INPUT -n -v
+    else
+        echo -e "${RED}iptables 命令未找到，无法显示规则。${NC}"
+    fi
     echo -e "${YELLOW}----------------------------------${NC}"
 }
 
@@ -86,8 +102,13 @@ delete_ports() {
 # 保存 iptables 规则
 save_iptables_rules() {
     echo -e "${YELLOW}\n保存 iptables 规则...${NC}"
-    rc-service iptables save || { echo -e "${RED}错误：保存 iptables 规则失败！请手动检查。${NC}"; exit 1; }
-    echo -e "${GREEN}iptables 规则已保存，重启后将生效。${NC}"
+    # 确保 rc-service 存在
+    if command -v rc-service >/dev/null; then
+        rc-service iptables save || { echo -e "${RED}错误：保存 iptables 规则失败！请手动检查。${NC}"; exit 1; }
+        echo -e "${GREEN}iptables 规则已保存，重启后将生效。${NC}"
+    else
+        echo -e "${RED}rc-service 命令未找到，无法保存规则。请手动保存。${NC}"
+    fi
 }
 
 # --- 主逻辑 ---
