@@ -37,7 +37,7 @@ done
 
 echo ""
 echo "========================================================"
-echo "开始批量处理授权 (目标用户: $TARGET_USER)"
+echo "开始批量处理授权与 Git 配置 (目标用户: $TARGET_USER)"
 echo "========================================================"
 
 # 5. 循环处理每一个目录
@@ -66,6 +66,7 @@ for RAW_DIR in "${DIRS_LIST[@]}"; do
     fi
 
     # 步骤 1：向上遍历沿途父目录并仅赋予穿透执行权限 (+x)
+    echo "[1/4] 打通沿途父目录穿透权限 (+x)..."
     PARENT_DIR="$(dirname "$TARGET_DIR")"
     while [ "$PARENT_DIR" != "/" ] && [ "$PARENT_DIR" != "." ]; do
         setfacl -m u:"$TARGET_USER":x "$PARENT_DIR"
@@ -73,14 +74,39 @@ for RAW_DIR in "${DIRS_LIST[@]}"; do
     done
 
     # 步骤 2：对当前目录及内部所有现有文件/目录递归授予读写执行权限 (rwx)
+    echo "[2/4] 配置当前目录及现有文件递归读写执行权限 (rwx)..."
     setfacl -R -m u:"$TARGET_USER":rwx "$TARGET_DIR"
 
     # 步骤 3：配置默认继承规则 (Default ACL)，让未来新建的文件自动具有 rwx
+    echo "[3/4] 配置未来新建文件的默认继承规则 (Default ACL)..."
     setfacl -R -d -m u:"$TARGET_USER":rwx "$TARGET_DIR"
 
-    echo -e "\033[32m[完成] $TARGET_DIR 授权成功！\033[0m"
-    echo "当前 ACL 规则确认:"
-    getfacl "$TARGET_DIR" 2>/dev/null | grep -E "user:$TARGET_USER|default:user:$TARGET_USER"
+    # 步骤 4：扫描 Git 仓库并为目标用户配置 safe.directory
+    echo "[4/4] 扫描 Git 仓库并配置 safe.directory..."
+    if command -v git >/dev/null 2>&1; then
+        FOUND_GIT=0
+        while IFS= read -r GIT_ITEM; do
+            [ -z "$GIT_ITEM" ] && continue
+            FOUND_GIT=1
+            REPO_DIR="$(readlink -f "$(dirname "$GIT_ITEM")")"
+
+            # 检查目标用户 git 全局配置中是否已有该目录（避免重复添加）
+            if sudo -u "$TARGET_USER" -H git config --global --get-all safe.directory 2>/dev/null | grep -Fxq "$REPO_DIR"; then
+                echo "  = [已存在] Git safe.directory: $REPO_DIR"
+            else
+                sudo -u "$TARGET_USER" -H git config --global --add safe.directory "$REPO_DIR"
+                echo -e "  \033[32m+ [已添加]\033[0m Git safe.directory: $REPO_DIR"
+            fi
+        done < <(find "$TARGET_DIR" -name ".git" -prune 2>/dev/null)
+
+        if [ "$FOUND_GIT" -eq 0 ]; then
+            echo "  i 未检测到 Git 仓库，跳过 safe.directory 配置。"
+        fi
+    else
+        echo -e "  \033[33m! 未安装 git，跳过 Git safe.directory 配置。\033[0m"
+    fi
+
+    echo -e "\033[32m[完成] $TARGET_DIR 处理完毕！\033[0m"
 done
 
 echo ""
